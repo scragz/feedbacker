@@ -53,11 +53,11 @@ import type {
   AudioGraph,
   MainThreadMessage as ProcessorMessage,
 } from './schema';
-import { MainThreadMessageType } from './schema';
+import { MainThreadMessageType, WorkletMessageType } from './schema'; // Added WorkletMessageType
 import { processMatrix } from './matrix';
-import { processGain } from './nodes/gain';
-import { processPassthrough } from './nodes/passthrough';
-import type { DSPKernel } from './nodes/dsp-kernel';
+// Import all kernels from the barrel file
+import { processGain, processDelay, processBiquad, processPassthrough } from './nodes';
+import type { DSPKernel } from './nodes'; // Import DSPKernel type from new location
 
 // No MFNProcessorInterface needed
 
@@ -81,6 +81,8 @@ class MFNProcessor extends AudioWorkletProcessor {
       this.maxChannelsConfig,
     );
     console.log('[MFNProcessor] Initialized');
+    // Send PROCESSOR_READY message back to the main thread
+    this.port.postMessage({ type: WorkletMessageType.PROCESSOR_READY });
   }
 
   private initializeGraph(
@@ -154,6 +156,14 @@ class MFNProcessor extends AudioWorkletProcessor {
             `[MFNProcessor] Output channels set to ${this.numChannels}`,
           );
         }
+        break;
+      }
+      case MainThreadMessageType.RENDER_OFFLINE: { // Added this case
+        const payload = message.payload;
+        console.log('[MFNProcessor] RENDER_OFFLINE message received, duration:', payload.durationSeconds, 'seconds. Offline rendering not yet implemented.');
+        // Actual offline rendering logic will be part of a later step (e.g., Step 12)
+        // For now, we can acknowledge the message.
+        // Example: this.port.postMessage({ type: WorkletMessageType.DATA_AVAILABLE, payload: { dataType: 'offlineRenderStatus', data: 'started' } });
         break;
       }
     }
@@ -265,13 +275,15 @@ class MFNProcessor extends AudioWorkletProcessor {
         case 'gain':
           kernel = processGain;
           break;
-        // Add cases for other node types (delay, biquad, etc.) here
-        // case \'delay\':
-        //   kernel = processDelay; // Example
-        //   break;
-        case 'input_mixer': // Input mixers have already had their main input mixed in.
-        case 'output_mixer': // Output mixers just sum; their "kernel" is effectively passthrough here.
-        default: // For unknown types or types that only pass through (like mixer nodes at this stage)
+        case 'delay': // Added case for delay
+          kernel = processDelay;
+          break;
+        case 'biquad': // Added case for biquad
+          kernel = processBiquad;
+          break;
+        case 'input_mixer':
+        case 'output_mixer':
+        default:
           kernel = processPassthrough;
           break;
       }
