@@ -1,190 +1,205 @@
-import { useState, useCallback, useRef } from 'react'; // Removed useEffect
-import { Text } from '@mantine/core'; // Ensure Text is imported, removed MantineProvider, MantineThemeOverride
+import './App.css';
+import { Flex } from '@mantine/core';
+import React, { useEffect, useState } from 'react';
+
+// Component Imports (assuming default exports)
 import Pedalboard from './components/Pedalboard/Pedalboard';
-import Header from './components/Header/Header';
-import Controls, { ControlsProps } from './components/Controls/Controls'; // Import ControlsProps
-import NodeList from './components/NodeList/NodeList';
+import Controls from './components/Controls/Controls';
+import StatusDisplay from './components/StatusDisplay/StatusDisplay';
 import NodeEditor from './components/NodeEditor/NodeEditor';
-import StatusDisplay, { StatusDisplayProps } from './components/StatusDisplay/StatusDisplay'; // Import StatusDisplayProps
-import type {
-  AudioGraph,
-  AudioNodeInstance,
-  NodeType,
-  ParameterValue,
-  UpdateParameterMessage,
-  AddNodeMessage, // Correctly import AddNodeMessage
-} from './audio/schema';
-import { MainThreadMessageType, NODE_PARAMETER_DEFINITIONS } from './audio/schema'; // Removed WorkletMessageType
+import { LayoutShell } from './components/LayoutShell/LayoutShell';
+
+// Hook Imports
 import { useAudioInitialization } from './hooks/useAudioInitialization';
-import { useProcessorStatusCheck } from './hooks/useProcessorStatusCheck';
 import { useProcessorInitialization } from './hooks/useProcessorInitialization';
+import { useProcessorStatusCheck } from './hooks/useProcessorStatusCheck';
 
-const initialGraph: AudioGraph = {
-  nodes: [],
-  routingMatrix: [],
-  masterGain: 0.75,
-  outputChannels: 2,
-};
+// Store Imports
+import { useGraphStore } from './stores/graph';
+import { useUIStore } from './stores/ui';
 
-const MAX_CHANNELS = 2; // Default to stereo, ensure this matches worklet and context
+// Bridge Imports
+import {
+  initAudioBridge,
+  sendInitRequestToProcessor,
+  sendParameterUpdateToProcessor,
+  resumeAudioContext, // Assuming this function uses the initialized audioContextRef from the bridge
+} from './lib/bridge';
+
+import type { AudioGraph, NodeId, ParameterId, AudioNode as AudioNodeType, SerializedAudioGraph, AudioContextState, MFNWorkletNode } from './audio/schema'; // Ensure MFNWorkletNode is exported or defined
+
+const INITIAL_CHANNELS = 2; // Or get from a config
 
 function App() {
-  // const [audioInitialized, setAudioInitialized] = useState(false); // Moved to useAudioInitialization
-  const [audioError, setAudioError] = useState<string | null>(null);
-  const [audioContextState, setAudioContextState] = useState<AudioContextState | null>(null);
+  const {
+    graph,
+    addNode: addNodeToStore,
+    removeNode: removeNodeFromStore, // Assuming this exists
+    updateNodeParameter: updateParamInStore,
+    loadGraph: loadGraphInStore,
+    getSerializedGraph,
+  } = useGraphStore();
+
+  const {
+    selectedNodeId,
+    isAudioContextRunning,
+    lastErrorMessage,
+    selectNode, // Assuming this exists
+    setAudioContextRunning,
+    setLastErrorMessage,
+  } = useUIStore();
+
+  // Local state for hooks and bridge coordination
+  // This state is passed to useAudioInitialization, which calls these setters
   const [processorReady, setProcessorReady] = useState(false);
-  // const [initMessageSent, setInitMessageSent] = useState(false); // Moved to useProcessorInitialization
-  // const [checkStatusSent, setCheckStatusSent] = useState(false); // Moved to useProcessorStatusCheck
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [audioGraph, setAudioGraph] = useState<AudioGraph>(initialGraph);
+  const [currentAudioContextState, setCurrentAudioContextState] =
+    useState<AudioContextState | null>(null);
 
-  // const audioContextRef = useRef<AudioContext | null>(null); // Moved to useAudioInitialization
-  // const workletNodeRef = useRef<AudioWorkletNode | null>(null); // Moved to useAudioInitialization
+  // This is a workaround for the setAudioGraph prop of useAudioInitialization
+  // The hook's internal graph updates might not be directly compatible with Zustand's model.
+  // Ideally, the hook/bridge would directly call store actions.
+  const [_, setLocalGraphForHook] = useState<AudioGraph>(graph);
 
-  const { audioContextRef, workletNodeRef, audioInitialized } = useAudioInitialization({
-    setAudioGraph,
-    setAudioError,
-    setProcessorReady,
-    setAudioContextState,
-  });
 
-  useProcessorStatusCheck({ // Removed unused destructured variables
-    audioContextState,
+  const {
+    audioContextRef,
     workletNodeRef,
-    processorReady,
+    audioInitialized,
+    // error: audioInitError, // This error is set via setAudioError -> setLastErrorMessage
+  } = useAudioInitialization({
+    setAudioGraph: setLocalGraphForHook, // The hook will call this
+    setAudioError: setLastErrorMessage, // Hook calls this to update UI store
+    setProcessorReady, // Hook calls this
+    setAudioContextState: setCurrentAudioContextState, // Hook calls this
   });
 
-  useProcessorInitialization({ // Removed unused destructured variables
+  // Initialize the bridge when audio context and processor port are ready
+  useEffect(() => {
+    const audioCtx = audioContextRef.current;
+    const port = workletNodeRef.current?.port;
+
+    if (audioCtx && port) {
+      initAudioBridge(audioCtx, port);
+      // Send the first INIT message via the bridge
+      // This might conflict if useProcessorInitialization also sends an INIT message.
+      // The bridge should be the single source of truth for sending messages.
+      if (audioInitialized && processorReady) { // Ensure processor is ready from its own message
+         console.log("[App.tsx] Bridge initialized, sending initial INIT request via bridge.");
+         sendInitRequestToProcessor(INITIAL_CHANNELS, audioCtx.sampleRate);
+      }
+    }
+  }, [audioContextRef, workletNodeRef, audioInitialized, processorReady]);
+
+
+  // useProcessorInitialization hook
+   const { initMessageSent /*, error: procInitError */ } = useProcessorInitialization({
     processorReady,
     workletNodeRef,
     audioContextRef,
-    audioGraph,
+    audioGraph: graph, // Pass the graph from the Zustand store
   });
+  // Note: procInitError should also be handled, e.g., via setLastErrorMessage
 
-  const handleResumeAudio = useCallback(async () => {
-    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
-      try {
-        await audioContextRef.current.resume();
-        console.log('[App.tsx] Audio context resumed.');
-      } catch (error) {
-        console.error('Error resuming audio context:', error);
-        setAudioError(error instanceof Error ? error.message : String(error));
-      }
-    }
-  }, [audioContextRef]); // Added audioContextRef to dependencies
+  // useProcessorStatusCheck hook
+  // const { checkStatusSent /*, error: statusCheckError */ } = useProcessorStatusCheck({
+  //   audioContextState: currentAudioContextState,
+  //   workletNodeRef,
+  //   processorReady,
+  // });
+  // Note: statusCheckError should also be handled
 
-  const handleAddNode = (type: NodeType) => {
-    if (!workletNodeRef.current || !audioContextRef.current) {
-      setAudioError("Worklet node or audio context not available to add node.");
-      return;
-    }
-    const newNodeId = `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const nodeParamDefinitionsMap = NODE_PARAMETER_DEFINITIONS[type];
-    const defaultParameters: Record<string, ParameterValue> = {};
-
-    // Removed unnecessary conditional as NODE_PARAMETER_DEFINITIONS[type] will always exist or be empty object
-    for (const paramKey in nodeParamDefinitionsMap) {
-      const paramDef = nodeParamDefinitionsMap[paramKey];
-      defaultParameters[paramDef.id] = paramDef.defaultValue;
-    }
-
-    const newNodeInstance: AudioNodeInstance = {
+  const handleAddNode = (type: AudioNodeType['kernel']) => {
+    const newNodeId = `node-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    const newNode: AudioNodeType = {
       id: newNodeId,
-      type,
-      parameters: defaultParameters,
+      kernel: type,
+      parameters: [], // Define default parameters based on type
+      position: { x: Math.random() * 400, y: Math.random() * 200 }, // Random position
     };
-
-    setAudioGraph(prevGraph => ({
-      ...prevGraph,
-      nodes: [...prevGraph.nodes, newNodeInstance],
-    }));
-
-    const message: AddNodeMessage = {
-      type: MainThreadMessageType.ADD_NODE,
-      payload: { nodeInstance: newNodeInstance }, // Corrected payload structure
-    };
-    workletNodeRef.current.port.postMessage(message);
-    console.log('[App.tsx] Sent ADD_NODE message for new node:', newNodeInstance);
-  };
-
-  const handleSelectNode = useCallback((nodeId: string | null) => {
-    setSelectedNodeId(nodeId);
-    console.log('[App.tsx] Selected node:', nodeId);
-  }, []);
-
-  const handleParameterUpdate = useCallback((nodeId: string, paramId: string, value: ParameterValue) => {
-    if (workletNodeRef.current) {
-      console.log(`[App.tsx] Updating parameter: Node ${nodeId}, Param ${paramId}, Value ${value}`);
-      const message: UpdateParameterMessage = {
-        type: MainThreadMessageType.UPDATE_PARAMETER,
-        payload: {
-          nodeId,
-          parameterId: paramId,
-          value,
-        },
-      };
-      workletNodeRef.current.port.postMessage(message);
-      setAudioGraph(prevGraph => ({
-        ...prevGraph,
-        nodes: prevGraph.nodes.map(n =>
-          n.id === nodeId
-            ? { ...n, parameters: { ...n.parameters, [paramId]: value } }
-            : n
-        ),
-      }));
-    } else {
-      setAudioError("Worklet node not available to update parameter.");
+    if (type === 'gain') {
+      newNode.parameters.push({ id: 'gain', value: 1, min: 0, max: 2, label: 'Gain' });
+    } else if (type === 'delay') {
+      newNode.parameters.push({ id: 'delayTime', value: 0.5, min: 0, max: 2, label: 'Delay Time' });
+      newNode.parameters.push({ id: 'feedback', value: 0.5, min: 0, max: 1, label: 'Feedback' });
+    } else if (type === 'biquad') {
+      newNode.parameters.push({ id: 'frequency', value: 1000, min: 20, max: 20000, label: 'Frequency' });
+      newNode.parameters.push({ id: 'Q', value: 1, min: 0.0001, max: 100, label: 'Q' });
+      newNode.parameters.push({ id: 'type', value: 0, min: 0, max: 7, label: 'Filter Type' }); // Assuming 0 is lowpass, etc.
     }
-  }, [workletNodeRef]); // Added workletNodeRef to dependencies
-
-  const selectedNode = audioGraph.nodes.find(node => node.id === selectedNodeId) ?? null;
-
-  // Props for StatusDisplay
-  const statusDisplayProps: StatusDisplayProps = {
-    error: audioError,
-    status: audioContextState,
-    onResume: handleResumeAudio,
+    addNodeToStore(newNode);
+    // The bridge will pick up this change from store subscription and send GRAPH_UPDATE
   };
 
-  // Props for Controls
-  const controlsProps: ControlsProps = {
-    onAddNode: handleAddNode,
-    audioContextState: audioContextState,
-    onAudioResume: () => { void handleResumeAudio(); }, // Ensure void return for onAudioResume
-    // Add any other props Controls might need, e.g., isProcessorReady: processorReady
+  const handleParameterChange = (nodeId: NodeId, paramId: ParameterId, value: number) => {
+    updateParamInStore(nodeId, paramId, value);
+    // The bridge will pick up this change for PARAM_UPDATE, or we can send it directly
+    // if (workletNodeRef.current?.port) {
+    //   sendParameterUpdateToProcessor(workletNodeRef.current.port, nodeId, paramId, value);
+    // }
   };
+
+  const selectedNodeInstance = selectedNodeId ? graph.nodes.get(selectedNodeId) : null;
+
+  // Combine error messages
+  const displayError = lastErrorMessage; // procInitError and statusCheckError could be combined here
+
+  // Determine status message
+  let currentStatusMessage = "Initializing...";
+  if (audioInitError) currentStatusMessage = `Audio Init Error: ${audioInitError}`;
+  else if (!audioInitialized) currentStatusMessage = "Initializing Audio System...";
+  else if (!processorReady) currentStatusMessage = "Audio Initialized. Waiting for Processor...";
+  else if (!initMessageSent) currentStatusMessage = "Processor Ready. Sending initial configuration...";
+  else currentStatusMessage = "System Ready.";
+
 
   return (
-    <>
-      <Pedalboard>
-        <Header />
-        <StatusDisplay {...statusDisplayProps} />
-        {!audioInitialized ? (
-          <Text>Initializing Audio...</Text>
-        ) : !processorReady && audioContextRef.current?.state === 'running' ? (
-          <Text>Audio Initialized. Waiting for Processor Ready Signal...</Text>
-        ) : !processorReady ? (
-           <Text>Audio Initialized. Waiting for audio context to run to check processor status...</Text>
-        ) : (
-          <>
-            <Controls {...controlsProps} />
-            <NodeList
-              nodes={audioGraph.nodes}
-              selectedNodeId={selectedNodeId}
-              onSelectNode={handleSelectNode}
+    <LayoutShell>
+      <Flex direction="column" style={{ height: '100%' }}>
+        <StatusDisplay
+          audioError={displayError}
+          audioInitialized={audioInitialized}
+          audioContextState={currentAudioContextState}
+          processorReady={processorReady}
+          initMessageSent={initMessageSent}
+          // message={currentStatusMessage} // StatusDisplay might construct its own message
+        />
+        <Controls
+          onAddNode={handleAddNode}
+          audioContextState={currentAudioContextState}
+          onAudioResume={async () => {
+            if (audioContextRef.current) {
+              await resumeAudioContext(); // Uses bridge's internal audioContextRef
+              setCurrentAudioContextState(audioContextRef.current.state);
+              setAudioContextRunning(audioContextRef.current.state === 'running');
+            }
+          }}
+        />
+
+        <Flex style={{ flexGrow: 1, overflow: 'hidden', position: 'relative' /* For positioning nodes */ }}>
+          <Pedalboard
+            nodes={Array.from(graph.nodes.values())}
+            connections={graph.connections}
+            nodeOrder={graph.nodeOrder}
+            // onNodeSelect={selectNode} // Assuming Pedalboard can call this
+            // onNodeMove, onConnect, etc.
+          />
+          {selectedNodeInstance && workletNodeRef.current?.port && (
+            <NodeEditor
+              selectedNode={selectedNodeInstance}
+              onParameterChange={handleParameterChange}
+              // processorPort={workletNodeRef.current.port} // Pass port if NodeEditor sends messages directly
             />
-            {selectedNode && (
-              <NodeEditor
-                key={selectedNode.id}
-                selectedNode={selectedNode}
-                onParameterChange={handleParameterUpdate}
-              />
-            )}
-          </>
-        )}
-      </Pedalboard>
-    </>
+          )}
+        </Flex>
+      </Flex>
+    </LayoutShell>
   );
 }
 
 export default App;
+
+// Helper to get initial graph from store for useState, if needed
+// const initialGraphFromStore = useGraphStore.getState().graph;
+
+// Placeholder for audioInitError if useAudioInitialization hook is changed to return it directly
+const audioInitError = null;

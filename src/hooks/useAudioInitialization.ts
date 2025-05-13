@@ -1,17 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { setupAudioWorklet } from '../audio';
+import { getAudioContext, loadMFNWorklet } from '../audio';
+import type { MFNWorkletNode } from '../audio'; // Import MFNWorkletNode as a type
 import type {
   AudioGraph,
-  NodeAddedMessage,
-  NodeRemovedMessage,
-  ParameterUpdatedMessage,
-  GraphUpdatedMessage,
-  WorkletErrorMessage,
-  WorkletMessage,
+  WorkletMessage, // Combined type for all messages
 } from '../audio/schema';
 import { WorkletMessageType } from '../audio/schema';
-
-const MAX_CHANNELS = 2; // Default to stereo, ensure this matches worklet and context
 
 interface UseAudioInitializationProps {
   setAudioGraph: React.Dispatch<React.SetStateAction<AudioGraph>>;
@@ -27,104 +21,100 @@ export function useAudioInitialization({
   setAudioContextState,
 }: UseAudioInitializationProps) {
   const audioContextRef = useRef<AudioContext | null>(null);
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
+  const workletNodeRef = useRef<MFNWorkletNode | null>(null);
   const [audioInitialized, setAudioInitialized] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
-    if (!audioContextRef.current) {
-      const initializeAudio = async () => {
-        try {
-          const context = new AudioContext();
+    const initializeAudio = async () => {
+      try {
+        const context = getAudioContext();
+        audioContextRef.current = context;
+        if (isMounted) setAudioContextState(context.state);
+        context.onstatechange = () => {
           if (isMounted) setAudioContextState(context.state);
-          context.onstatechange = () => {
-            if (isMounted) setAudioContextState(context.state);
-          };
+        };
 
-          await setupAudioWorklet(context);
-          const mfnNode = new AudioWorkletNode(context, 'mfn-processor', {
-            numberOfInputs: 1,
-            numberOfOutputs: 1,
-            outputChannelCount: [MAX_CHANNELS],
-            processorOptions: { maxChannels: MAX_CHANNELS, sampleRate: context.sampleRate },
-          });
+        const mfnNode = await loadMFNWorklet();
+        workletNodeRef.current = mfnNode;
 
-          mfnNode.connect(context.destination);
+        // Connect the worklet node to the destination
+        mfnNode.connect(context.destination);
 
-          mfnNode.port.onmessage = (event: MessageEvent<WorkletMessage>) => {
-            if (!isMounted) return;
-            const { type, payload } = event.data;
-            console.log('[useAudioInitialization.ts] Received message from worklet:', type, payload);
+        mfnNode.port.onmessage = (event: MessageEvent<WorkletMessage>) => {
+          if (!isMounted) return;
+          const { type, payload } = event.data;
+          // console.log('[useAudioInitialization.ts] Received message from worklet:', type, payload);
 
-            switch (type) {
-              case WorkletMessageType.PROCESSOR_READY:
-                if (isMounted) setProcessorReady(true);
-                console.log('[useAudioInitialization.ts] Audio processor is ready.');
-                break;
-              case WorkletMessageType.NODE_ADDED:
-                if (isMounted && payload) {
-                  const nodeAddedPayload = payload as NodeAddedMessage['payload'];
-                  setAudioGraph(prevGraph => ({
-                    ...prevGraph,
-                    nodes: [...prevGraph.nodes, nodeAddedPayload],
-                  }));
-                }
-                break;
-              case WorkletMessageType.NODE_REMOVED:
-                if (isMounted && payload) {
-                  const nodeRemovedPayload = payload as NodeRemovedMessage['payload'];
-                  setAudioGraph(prevGraph => ({
-                    ...prevGraph,
-                    nodes: prevGraph.nodes.filter(n => n.id !== nodeRemovedPayload.nodeId),
-                  }));
-                }
-                break;
-              case WorkletMessageType.PARAMETER_UPDATED:
-                if (isMounted && payload) {
-                  const paramUpdatedPayload = payload as ParameterUpdatedMessage['payload'];
-                  setAudioGraph(prevGraph => ({
-                    ...prevGraph,
-                    nodes: prevGraph.nodes.map(n =>
-                      n.id === paramUpdatedPayload.nodeId
-                        ? { ...n, parameters: { ...n.parameters, [paramUpdatedPayload.parameterId]: paramUpdatedPayload.value } }
-                        : n
-                    ),
-                  }));
-                }
-                break;
-              case WorkletMessageType.GRAPH_UPDATED:
-                if (isMounted && payload) {
-                  setAudioGraph(payload as GraphUpdatedMessage['payload']);
-                }
-                break;
-              case WorkletMessageType.WORKLET_ERROR:
-              case WorkletMessageType.NODE_ERROR:
-                if (isMounted && payload) {
-                  const errorPayload = payload as WorkletErrorMessage['payload'];
-                  setAudioError(errorPayload.message);
-                  console.error('[useAudioInitialization.ts] Worklet Error:', errorPayload.message);
-                }
-                break;
-              default:
-                console.warn('[useAudioInitialization.ts] Received unknown message type from worklet:', type);
-            }
-          };
+          switch (type) {
+            case WorkletMessageType.PROCESSOR_READY:
+              setProcessorReady(true);
+              console.log('[useAudioInitialization.ts] Audio processor is ready.');
+              // Example: Accessing payload if it was defined for PROCESSOR_READY
+              // if (payload && 'sampleRate' in payload) {
+              //   console.log('Processor ready with sampleRate:', payload.sampleRate);
+              // }
+              break;
+            case WorkletMessageType.NODE_ADDED:
+              // Payload is non-optional for NODE_ADDED (AudioNodeInstance)
+              setAudioGraph(prevGraph => ({
+                ...prevGraph,
+                nodes: [...prevGraph.nodes, payload],
+              }));
+              break;
+            case WorkletMessageType.NODE_REMOVED:
+              // Payload is non-optional for NODE_REMOVED ({ nodeId: string })
+              setAudioGraph(prevGraph => ({
+                ...prevGraph,
+                nodes: prevGraph.nodes.filter(n => n.id !== payload.nodeId),
+              }));
+              break;
+            case WorkletMessageType.PARAMETER_UPDATED:
+              // Payload is non-optional for PARAMETER_UPDATED ({ nodeId: string, parameterId: string, value: ParameterValue })
+              setAudioGraph(prevGraph => ({
+                ...prevGraph,
+                nodes: prevGraph.nodes.map(n =>
+                  n.id === payload.nodeId
+                    ? { ...n, parameters: { ...n.parameters, [payload.parameterId]: payload.value } }
+                    : n
+                ),
+              }));
+              break;
+            case WorkletMessageType.GRAPH_UPDATED:
+              // Payload is non-optional for GRAPH_UPDATED (AudioGraph)
+              setAudioGraph(payload);
+              break;
+            case WorkletMessageType.WORKLET_ERROR:
+            case WorkletMessageType.NODE_ERROR:
+              // Payload is non-optional for WORKLET_ERROR/NODE_ERROR ({ message: string })
+              setAudioError(payload.message);
+              console.error('[useAudioInitialization.ts] Worklet Error:', payload.message);
+              break;
+            default:
+              // Exhaustive check for message types, TS should warn if a case is missed.
+              // const _exhaustiveCheck: never = type; // Uncomment for exhaustive check
+              console.warn('[useAudioInitialization.ts] Received unknown message type from worklet:', type);
+          }
+        };
 
-          audioContextRef.current = context;
-          workletNodeRef.current = mfnNode;
-          if (isMounted) setAudioInitialized(true);
+        if (isMounted) setAudioInitialized(true);
 
-        } catch (error) {
-          console.error('Error initializing audio:', error);
-          if (isMounted) setAudioError(error instanceof Error ? error.message : String(error));
-        }
-      };
-      void initializeAudio();
-    }
+      } catch (error) {
+        console.error('Error initializing audio:', error);
+        if (isMounted) setAudioError(error instanceof Error ? error.message : String(error));
+      }
+    };
+    void initializeAudio();
+
     return () => {
       isMounted = false;
+      // Consider cleanup:
+      // if (workletNodeRef.current) {
+      //   workletNodeRef.current.port.onmessage = null;
+      //   workletNodeRef.current.disconnect();
+      // }
       // if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      //   // audioContextRef.current.close(); // Consider implications before enabling
+      //   // audioContextRef.current.close(); // Closing context might be too aggressive
       // }
     };
   }, [setAudioContextState, setAudioError, setAudioGraph, setProcessorReady]);

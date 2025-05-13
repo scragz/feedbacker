@@ -63,7 +63,7 @@
 
 ## Phase 5 · State Management & Bridge
 
-- [ ] **Step 8: Zustand slices & Audio bridge**
+- [x] **Step 8: Zustand slices & Audio bridge**
   - **Task**:
     - `stores/graph.ts`, `stores/ui.ts` with initial state/actions.
     - `lib/bridge.ts`: wraps AudioContext, MessagePort, translates store changes to worklet messages (debounced 5 ms).

@@ -35,6 +35,17 @@ declare global {
   // }
 }
 
+// If you have custom events or other global types, declare them here.
+// Example:
+// declare interface Window {
+//   myCustomGlobal: string;
+// }
+
+/**
+ * Represents the state of an AudioContext.
+ */
+type AudioContextState = 'suspended' | 'running' | 'closed';
+
 // This export {} is important to make this file a module, which allows `declare global`.
 // If it's not a module, `declare global` might affect the actual global scope differently.
 export {};
