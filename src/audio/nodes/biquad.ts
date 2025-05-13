@@ -219,24 +219,15 @@ export const processBiquad: DSPKernel = (
     state.lastCalculatedNumChannels = numChannels;
   }
 
-  // After initialization/update, state.channelStates is guaranteed to be BiquadChannelState[]
-  const channelStates = state.channelStates as BiquadChannelState[]; // Type assertion for clarity, though compiler might infer
+  // After initialization/update, state.channelStates is guaranteed to be non-null and populated.
+  const channelStates = state.channelStates;
 
   for (let c = 0; c < numChannels; c++) {
     const inputChannel = inputs[c];
     const outputChannel = outputs[c];
-    // Assuming MFNProcessor ensures inputChannel, outputChannel, and channelStates[c] are valid
-    // based on numChannels, so direct access is safe.
-    const chanState = channelStates[c];
-
-    // If, for some unexpected reason, any of these are undefined, skip processing for this channel.
-    // This is a defensive check; ideally, the MFNProcessor setup prevents this.
-    if (!inputChannel || !outputChannel || !chanState) {
-      if (outputChannel) {
-        outputChannel.fill(0); // Silence if essential parts are missing
-      }
-      continue;
-    }
+    // Assuming MFNProcessor guarantees inputs[c] and outputs[c] exist for c < numChannels,
+    // and chanState is prepared for numChannels, direct access should be safe.
+    const chanState = channelStates[c]; // Accessing directly
 
     const { b0, b1, b2, a1, a2 } = chanState;
     let { x1, x2, y1, y2 } = chanState; // Get copies of state variables
