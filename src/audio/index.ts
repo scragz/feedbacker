@@ -27,12 +27,14 @@ let mfnNode: MFNWorkletNode | null = null;
  */
 export function getAudioContext(): AudioContext {
   if (!audioContext) {
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioContext = new AudioContext();
     if (!audioContext) {
       throw new Error('AudioContext is not supported in this browser.');
     }
     // Optional: Resume context if it was suspended by autoplay policy
-    audioContext.resume().catch(err => console.error('AudioContext resume failed:', err));
+    audioContext.resume().catch((err: unknown) => {
+      console.error('AudioContext resume failed:', err);
+    });
   }
   return audioContext;
 }

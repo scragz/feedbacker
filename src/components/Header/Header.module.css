@@ -1,12 +1,9 @@
-// filepath: /Users/scragz/Projects/feedbacker/src/components/Header/Header.module.css
 .header {
   padding: 10px 0;
   margin-bottom: 15px;
 }
 
 .logo {
-  font-family: 'Arial Black', Gadget, sans-serif; /* Placeholder, choose a cool font */
-  font-size: 3em;
   color: #e0e0e0;
   background-color: #707070; /* Darker metallic */
   border: 2px solid #505050;

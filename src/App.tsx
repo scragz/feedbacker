@@ -1,20 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
-import './App.css';
 import { initializeAudioSystem, ensureAudioContextResumed, getAudioContext, getMFNWorkletNode } from './audio';
-// Import ParameterDefinition type and createEmptyRoutingMatrix
-import type { AudioGraph, AudioNodeInstance, NodeType, WorkletMessage, ParameterValue, ParameterDefinition } from './audio/schema';
+import type { AudioGraph, AudioNodeInstance, NodeType, ParameterValue, ParameterDefinition, WorkletMessage } from './audio/schema';
 import { MainThreadMessageType, NODE_PARAMETER_DEFINITIONS, WorkletMessageType as WorkletMsgTypeEnum } from './audio/schema';
-import { createEmptyRoutingMatrix } from './audio/matrix'; // Added import
+import { createEmptyRoutingMatrix } from './audio/matrix';
+
+import Pedalboard from './components/Pedalboard/Pedalboard';
+import Header from './components/Header/Header';
+import Controls from './components/Controls/Controls';
+import NodeList from './components/NodeList/NodeList';
+import NodeEditor from './components/NodeEditor/NodeEditor';
+import StatusDisplay from './components/StatusDisplay/StatusDisplay';
 
 const MAX_CHANNELS = 8;
 
 function App() {
-  const [count, setCount] = useState(0);
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [audioContextState, setAudioContextState] = useState<AudioContextState | null>(null);
   const [processorReady, setProcessorReady] = useState(false);
   const [initMessageSent, setInitMessageSent] = useState(false);
+  const [checkStatusSent, setCheckStatusSent] = useState(false);
 
   const [audioGraph, setAudioGraph] = useState<AudioGraph>(() => {
     const initialNodes: AudioNodeInstance[] = [
@@ -45,6 +50,12 @@ function App() {
             if (event.data.type === WorkletMsgTypeEnum.PROCESSOR_READY) {
               setProcessorReady(true);
               console.log('[App.tsx] MFNProcessor reported READY.');
+            } else if (event.data.type === WorkletMsgTypeEnum.NODE_ERROR) { // Removed redundant payload check
+              console.error(`[App.tsx] Node Error from Worklet: Node ID ${event.data.payload.nodeId}, Message: ${event.data.payload.error}`);
+              setAudioError(`Node Error: ${event.data.payload.nodeId} - ${event.data.payload.error}`);
+            } else if (event.data.type === WorkletMsgTypeEnum.WORKLET_ERROR) { // Removed redundant payload check
+              console.error(`[App.tsx] General Worklet Error: ${event.data.payload.message}`);
+              setAudioError(`Worklet Error: ${event.data.payload.message}`);
             }
           };
         } else {
@@ -52,6 +63,7 @@ function App() {
           setAudioError('MFNWorkletNode not available.');
         }
 
+        const context = getAudioContext(); // Re-get context in case it was recreated
         context.onstatechange = () => {
           setAudioContextState(context.state);
           console.log(`[App.tsx] AudioContext state changed to: ${context.state}`);
@@ -86,22 +98,34 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const currentContext = getAudioContext();
-    const currentWorkletNode = getMFNWorkletNode();
+    if (audioInitialized && audioContextState === 'running' && !checkStatusSent) {
+      const currentWorkletNode = getMFNWorkletNode();
+      if (currentWorkletNode) { // Explicit check for worklet node
+        console.log('[App.tsx] Context running, audio initialized, sending CHECK_PROCESSOR_STATUS.');
+        currentWorkletNode.port.postMessage({
+          type: MainThreadMessageType.CHECK_PROCESSOR_STATUS,
+        });
+        setCheckStatusSent(true);
+      } else {
+        console.warn('[App.tsx] CHECK_PROCESSOR_STATUS not sent: WorkletNode not available yet.');
+      }
+    }
+  }, [audioContextState, checkStatusSent, audioInitialized]);
 
-    if (currentContext && currentWorkletNode && currentContext.state === 'running' && processorReady && !initMessageSent) {
-      console.log('[App.tsx] Context running, processor ready, sending INIT_PROCESSOR.');
-      currentWorkletNode.port.postMessage({
-        type: MainThreadMessageType.INIT_PROCESSOR,
-        payload: {
-          graph: audioGraph,
-          sampleRate: currentContext.sampleRate,
-          maxChannels: MAX_CHANNELS,
-        },
-      });
+  useEffect(() => {
+    if (audioInitialized && audioContextState === 'running' && processorReady && !initMessageSent) {
+      const currentContext = getAudioContext(); // Ensure we have the latest context reference
+      const currentWorkletNode = getMFNWorkletNode();
+      if (currentContext && currentWorkletNode) { // Explicit checks
+        console.log('[App.tsx] Processor ready, sending INIT_PROCESSOR.');
+        currentWorkletNode.port.postMessage({
+          type: MainThreadMessageType.INIT_PROCESSOR,
+          payload: {
+            graph: audioGraph,
+            sampleRate: currentContext.sampleRate,
       setInitMessageSent(true);
     }
-  }, [audioContextState, processorReady, audioGraph, initMessageSent]);
+  }, [processorReady, audioGraph, initMessageSent, audioContextState, audioInitialized]);
 
   const handleResumeAudio = useCallback(async () => {
     try {
@@ -146,7 +170,6 @@ function App() {
         for (const paramKey in params) {
           if (Object.prototype.hasOwnProperty.call(params, paramKey)) {
             const paramDef = params[paramKey];
-            // defaultValue is a required property in ParameterDefinition, so direct access is safe if paramDef is valid.
             newNodeParams[paramDef.id] = paramDef.defaultValue;
           }
         }
@@ -163,12 +186,12 @@ function App() {
 
       const updatedRoutingMatrix = createEmptyRoutingMatrix(newNumNodes, prevGraph.outputChannels);
 
+      // Preserve existing connections in the larger matrix
       for (let c = 0; c < prevGraph.outputChannels; c++) {
-        for (let i = 0; i < prevGraph.nodes.length; i++) {
-          for (let j = 0; j < prevGraph.nodes.length; j++) {
-            const sourceValue = prevGraph.routingMatrix[c]?.[i]?.[j];
-            if (sourceValue !== undefined && updatedRoutingMatrix[c]?.[i]) {
-              updatedRoutingMatrix[c][i][j] = sourceValue;
+        for (let i = 0; i < prevGraph.nodes.length; i++) { // Iterate up to old number of nodes
+          for (let j = 0; j < prevGraph.nodes.length; j++) { // Iterate up to old number of nodes
+            if (prevGraph.routingMatrix[c]?.[i]?.[j] !== undefined) {
+               updatedRoutingMatrix[c][i][j] = prevGraph.routingMatrix[c][i][j];
             }
           }
         }
@@ -193,57 +216,28 @@ function App() {
   };
 
   return (
-    <>
-      <h1 className="chrome">FEEDBACKER</h1>
-      <div className="card">
-        <button onClick={() => { setCount((c) => c + 1); }}>
-          count is {count}
-        </button>
-        {audioError && (
-          <p style={{ color: 'red' }}>Audio Error: {audioError}</p>
-        )}
-        {audioInitialized && !audioError && (
-          <p style={{ color: 'green' }}>
-            Audio system core initialized! Context State: {audioContextState}.
-            {processorReady ? ' Processor Ready.' : ' Waiting for processor...'}
-            {initMessageSent && ' Initial graph sent.'}
-          </p>
-        )}
-        {!audioInitialized && !audioError && audioContextState && (
-          <p>Initializing audio system... Current Context State: {audioContextState}</p>
-        )}
-        {audioContextState === 'suspended' && (
-          <button onClick={() => { void handleResumeAudio(); }}>Resume Audio Context</button>
-        )}
-      </div>
-
+    <Pedalboard>
+      <Header />
+      <StatusDisplay
+        audioError={audioError}
+        audioInitialized={audioInitialized}
+        audioContextState={audioContextState}
+        processorReady={processorReady}
+        initMessageSent={initMessageSent}
+      />
+      {/* Render controls only when the full audio pipeline is ready */}
       {audioInitialized && processorReady && initMessageSent && (
-        <div className="audio-controls">
-          <h2>Audio Graph Controls</h2>
-          <button onClick={() => { handleAddNode('gain'); }}>Add Gain Node</button>
-          <button onClick={() => { handleAddNode('delay'); }}>Add Delay Node</button>
-          <button onClick={() => { handleAddNode('biquad'); }}>Add Biquad Filter Node</button>
-
-          <h3>Current Nodes:</h3>
-          {audioGraph.nodes.length === 0 ? (<p>No nodes in the graph.</p>) : (
-            <ul>
-              {audioGraph.nodes.map(node => (
-                <li key={node.id}>
-                  ID: {node.id}, Type: {node.type}
-                  {Object.keys(node.parameters).length > 0 && (
-                    <ul style={{ fontSize: '0.8em', marginLeft: '10px'}}>
-                      {Object.entries(node.parameters).map(([paramId, value]) => (
-                        <li key={paramId}>{paramId}: {String(value)}</li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <>
+          <Controls
+            onAddNode={handleAddNode}
+            audioContextState={audioContextState}
+            onAudioResume={() => { void handleResumeAudio(); }} // MODIFIED: Wrap async call
+          />
+          <NodeList nodes={audioGraph.nodes} />
+          <NodeEditor />
+        </>
       )}
-    </>
+    </Pedalboard>
   );
 }
 

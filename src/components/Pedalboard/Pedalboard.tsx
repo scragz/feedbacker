@@ -5,8 +5,8 @@ interface PedalboardProps {
   children: React.ReactNode;
 }
 
-const Pedalboard: React.FC<PedalboardProps> = ({ children }) => {
-  return <div className={classes.pedalboard}>{children}</div>;
+const Pedalboard: React.FC<PedalboardProps> = ({ children, ...props }) => {
+  return <div className={classes.pedalboard} {...props}>{children}</div>;
 };
 
 export default Pedalboard;

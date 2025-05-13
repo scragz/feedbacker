@@ -12,6 +12,7 @@
   "dependencies": {
     "@mantine/core": "^8.0.0",
     "@mantine/hooks": "^8.0.0",
+    "classnames": "^2.5.1",
     "idb": "^8.0.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

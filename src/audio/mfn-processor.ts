@@ -110,7 +110,7 @@ class MFNProcessor extends AudioWorkletProcessor {
   constructor(options?: globalThis.AudioWorkletNodeOptions) { // Explicitly use globalThis
     super(options);
     this.port.onmessage = this.handleMessage.bind(this);
-    this.port.postMessage({ type: WorkletMsgTypeEnum.PROCESSOR_READY }); // Removed 'as WorkletMessage'
+    console.log('[MFNProcessor] Constructor: Port open, awaiting CHECK_PROCESSOR_STATUS from main thread.');
   }
 
   private handleMessage(event: MessageEvent<MainThreadMessage>): void {
@@ -183,6 +183,11 @@ class MFNProcessor extends AudioWorkletProcessor {
         // is derived from the 'outputs' argument in the process() method.
         break;
       }
+      // ADDED: New case for the handshake
+      case MainThreadMessageType.CHECK_PROCESSOR_STATUS:
+        this.port.postMessage({ type: WorkletMsgTypeEnum.PROCESSOR_READY });
+        console.log('[MFNProcessor] Received CHECK_PROCESSOR_STATUS, sent PROCESSOR_READY.');
+        break;
       default:
         console.warn('[MFNProcessor] Unknown message type:', type);
     }

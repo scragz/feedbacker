@@ -24,6 +24,8 @@ export enum MainThreadMessageType {
   SET_OUTPUT_CHANNELS = 'SET_OUTPUT_CHANNELS',
   /** Control message for playback (e.g. play/pause, though typically handled by AudioContext) */
   TRANSPORT_CONTROL = 'TRANSPORT_CONTROL', // Example, might not be needed if AudioContext handles it
+  /** Message from main thread to check if processor is alive and ready. */
+  CHECK_PROCESSOR_STATUS = 'CHECK_PROCESSOR_STATUS',
 }
 
 /**
@@ -163,12 +165,24 @@ export interface SetOutputChannelsMessage {
   };
 }
 
+/**
+ * ADDED: Interface for the new message type
+ */
+export interface CheckProcessorStatusMessage {
+  type: MainThreadMessageType.CHECK_PROCESSOR_STATUS;
+  payload?: null; // No payload needed for this message
+}
+
 export type MainThreadMessage =
   | InitProcessorMessage
   | UpdateGraphMessage
   | UpdateParameterMessage
   | RenderOfflineMessage
-  | SetOutputChannelsMessage;
+  | SetOutputChannelsMessage
+  /**
+   * ADDED: New message type to the union
+   */
+  | CheckProcessorStatusMessage;
 
 // --- Worklet to Main Thread ---
 
