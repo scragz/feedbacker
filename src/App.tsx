@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import reactLogo from './assets/react.svg';
-import viteLogo from '/vite.svg';
 import './App.css';
 import { initializeAudioSystem, ensureAudioContextResumed, getAudioContext, getMFNWorkletNode } from './audio';
 // Import ParameterDefinition type and createEmptyRoutingMatrix
