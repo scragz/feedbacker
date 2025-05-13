@@ -2,7 +2,7 @@
 
 ## Phase 1 · Project Bootstrap
 
-- [ ] **Step 1: Initialise Vite React TS project**
+- [x] **Step 1: Initialise Vite React TS project**
   - **Task**:
     - `npm create vite@latest mfn-web-audio -- --template react-ts`
     - `cd mfn-web-audio && npm i`
@@ -15,21 +15,21 @@
 
 ## Phase 2 · Directory Skeleton & Shared Types
 
-- [ ] **Step 2: Create base folder hierarchy**
+- [x] **Step 2: Create base folder hierarchy**
 
   - **Task**: Add empty folders & placeholder index files matching spec.
   - **Files**:
     - `src/audio/`, `src/audio/nodes/`, `src/lib/`, `src/components/`, `src/stores/`, `src/pages/`, each with `README.md` or placeholder `.ts`/`.tsx`.
   - **Dependencies**: Step 1
 
-- [ ] **Step 3: Define global typings & schema**
+- [x] **Step 3: Define global typings & schema**
   - **Task**: `audio/schema.ts` – message enums, node/param interfaces, routing matrix types (3-D).
   - **Files**: `src/audio/schema.ts`, update `tsconfig.json` paths if needed.
   - **Dependencies**: Step 2
 
 ## Phase 3 · AudioWorklet Core
 
-- [ ] **Step 4: Stub MFNProcessor & register worklet**
+- [x] **Step 4: Stub MFNProcessor & register worklet**
 
   - **Task**:
     - `src/audio/mfn-processor.ts`: subclass `AudioWorkletProcessor`; handle `INIT`, `GRAPH_UPDATE`, `PARAM_UPDATE`, `RENDER_OFFLINE`.
@@ -39,7 +39,7 @@
   - **Dependencies**: Steps 1-3
   - **User Instructions**: Run `npm run dev`; check console log from processor.
 
-- [ ] **Step 5: Implement core DSP loop & multichannel routing**
+- [x] **Step 5: Implement core DSP loop & multichannel routing**
   - **Task**:
     - In `mfn-processor.ts`, iterate `channels`, apply per-channel node chain, mix via routing matrix, RMS guard.
     - Utility in `audio/matrix.ts` for fast matrix multiply across channels.
@@ -48,7 +48,7 @@
 
 ## Phase 4 · Node Kernel Library
 
-- [ ] **Step 6: Add initial DSP kernels**
+- [/] **Step 6: Add initial DSP kernels**
 
   - **Task**: Implement `delay`, `gain`, `biquad` in `audio/nodes/`. Each exports pure function `(buf, params, state)`.
   - **Files**: up to 6 kernel files + index barrel.
@@ -72,7 +72,7 @@
 
 ## Phase 6 · UI Framework
 
-- [ ] **Step 9: App shell & Mantine provider**
+- [/] **Step 9: App shell & Mantine provider**
 
   - **Task**: Replace default `App.tsx` with layout incl. theme toggle, sidebar for patch list, main workspace.
   - **Files**: `src/App.tsx`, `src/components/LayoutShell.tsx`, theme file.
