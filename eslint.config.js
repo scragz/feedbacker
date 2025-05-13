@@ -6,16 +6,16 @@ import tseslint from 'typescript-eslint'
 import prettierConfig from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  { ignores: ['dist', 'node_modules', '.turbo', 'build'] }, // Added more common ignores
   {
     // @ts-expect-error: no-unsafe-assignment -- TODO: fix this
     extends: [js.configs.recommended, ...tseslint.configs.strictTypeChecked, ...tseslint.configs.stylisticTypeChecked, prettierConfig],
-    files: ['**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}'], // Specify src directory for app files
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
-        project: true,
+        project: './tsconfig.app.json', // Point to tsconfig.app.json
         tsconfigRootDir: import.meta.dirname,
       }
     },
@@ -33,4 +33,14 @@ export default tseslint.config(
       // e.g.: '@typescript-eslint/no-unused-vars': 'error',
     },
   },
+  // Config for other files like vite.config.ts, eslint.config.js (if needed)
+  // These might use tsconfig.node.json or a simpler config if not type-checked strictly
+  {
+    files: ['*.config.js', '*.config.ts'], // e.g., vite.config.ts, eslint.config.js
+    languageOptions: {
+      globals: globals.node,
+    },
+    // Optionally, extend with JS/TS recommendations if not covered by the main config
+    // extends: [js.configs.recommended, ...tseslint.configs.recommended],
+  }
 )
