@@ -10,6 +10,15 @@ interface ControlsProps {
 }
 
 const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAudioResume }) => {
+  const addGainNode = () => {
+    onAddNode('gain');
+  };
+  const addDelayNode = () => {
+    onAddNode('delay');
+  };
+  const addBiquadNode = () => {
+    onAddNode('biquad');
+  };
   return (
     <div className={classes.controlsContainer}>
       <h3 className={classes.controlsTitle}>Controls</h3>
@@ -19,13 +28,13 @@ const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAud
         </Button>
       )}
       <Group className={classes.buttonGroup} grow>
-        <Button onClick={() => onAddNode('gain')} variant="light">
+        <Button onClick={addGainNode} variant="light">
           Add Gain
         </Button>
-        <Button onClick={() => onAddNode('delay')} variant="light">
+        <Button onClick={addDelayNode} variant="light">
           Add Delay
         </Button>
-        <Button onClick={() => onAddNode('biquad')} variant="light">
+        <Button onClick={addBiquadNode} variant="light">
           Add Biquad
         </Button>
       </Group>

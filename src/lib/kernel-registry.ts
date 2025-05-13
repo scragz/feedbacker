@@ -1,5 +1,5 @@
-import { DSPKernel } from '../audio/nodes/dsp-kernel';
-import * as Kernels from '../audio/nodes'; // Import all named exports
+import type { DSPKernel } from '../audio/nodes/dsp-kernel';
+import * as Kernels from '../audio/nodes';
 
 export class KernelRegistry {
   private registry: Map<string, DSPKernel> = new Map<string, DSPKernel>();

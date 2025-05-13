@@ -1,5 +1,5 @@
-import { AudioGraph, AudioNodeInstance, RoutingMatrix, NODE_PARAMETER_DEFINITIONS, NodeType } from '../audio/schema';
-import type { ParameterDefinition } from '../audio/schema'; // Type-only import
+import type { AudioGraph, AudioNodeInstance, RoutingMatrix, NodeType, ParameterDefinition } from '../audio/schema';
+import { NODE_PARAMETER_DEFINITIONS } from '../audio/schema';
 import { kernelRegistry as defaultKernelRegistry, KernelRegistry } from './kernel-registry';
 
 const DEFAULT_SAMPLE_RATE = 48000;
@@ -11,7 +11,7 @@ const DEFAULT_MASTER_GAIN = 1.0;
 function createEmpty3DRoutingMatrix(numChannels: number, numNodes: number): RoutingMatrix {
   return Array(numChannels).fill(null).map(() =>
     Array(numNodes).fill(null).map((): number[] =>
-      Array(numNodes).fill(0)
+      Array(numNodes).fill(0) as number[]
     )
   );
 }
@@ -195,12 +195,6 @@ export class MFNGraphBuilder {
     if (destNodeIndex === -1) {
       console.warn(`Destination node "${destNodeId}" not found.`);
       return this;
-    }
-
-    if (!this.routingMatrixInternal[channelIndex] ||
-        !this.routingMatrixInternal[channelIndex][sourceNodeIndex]) {
-       console.error('Routing matrix not properly initialized for setRoute.');
-       return this;
     }
     this.routingMatrixInternal[channelIndex][sourceNodeIndex][destNodeIndex] = gainValue;
     return this;

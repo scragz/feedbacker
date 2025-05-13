@@ -1,16 +1,19 @@
 .nodeListContainer {
-  background-color: #2c2c2c; /* Darker background for the list area */
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: var(--mantine-radius-md);
+  background-color: var(--mantine-color-dark-7); /* Darker background for the container */
   padding: 15px;
-  border-radius: 8px;
   box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
 }
 
 .nodeListTitle {
-  color: #d0d0d0;
+  color: var(--mantine-color-gray-4);
   margin-top: 0;
   margin-bottom: 10px;
   font-size: 1.1em;
   text-align: center;
+  font-family: 'Orbitron', sans-serif; /* Sci-fi/digital font */
+  letter-spacing: 1px;
 }
 
 .list {
@@ -25,20 +28,44 @@
   background-color: #383838;
   color: #c0c0c0;
   padding: 8px 12px;
-  margin-bottom: 5px;
-  border-radius: 4px;
+  margin-bottom: var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-sm);
   border: 1px solid #484848;
   font-size: 0.9em;
+  transition: background-color 0.15s ease;
+}
+
+.nodeButton {
+  display: block; /* Make the button take full width of the list item */
+  width: 100%;
+  padding: var(--mantine-spacing-sm);
+  text-align: left;
+  color: var(--mantine-color-gray-0);
+  border-radius: var(--mantine-radius-sm);
+  background-color: transparent; /* Default state */
+}
+
+.nodeButton:hover {
+  background-color: var(--mantine-color-dark-5); /* Hover effect for all buttons */
+}
+
+.selectedItem .nodeButton {
+  background-color: var(--mantine-color-blue-7); /* Distinct background for selected item's button */
+  color: var(--mantine-color-white);
+}
+
+.selectedItem .nodeButton:hover {
+  background-color: var(--mantine-color-blue-6); /* Slightly lighter blue on hover for selected */
 }
 
 .nodeParameters {
-  font-size: 0.8em;
-  margin-left: 15px;
-  margin-top: 5px;
-  list-style-type: disc; /* Or none if preferred */
-  color: #a0a0a0;
+  margin-top: var(--mantine-spacing-xs);
+  padding-left: var(--mantine-spacing-lg); /* Indent parameters */
+  font-size: var(--mantine-font-size-sm);
+  color: var(--mantine-color-gray-5);
 }
 
 .parameterItem {
   margin-bottom: 3px;
+  color: var(--mantine-color-gray-3);
 }

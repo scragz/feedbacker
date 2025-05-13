@@ -16,6 +16,8 @@ export enum MainThreadMessageType {
   INIT_PROCESSOR = 'INIT_PROCESSOR',
   /** Update the entire audio graph structure (nodes, connections). */
   UPDATE_GRAPH = 'UPDATE_GRAPH',
+  /** Add a new node to the graph. */
+  ADD_NODE = 'ADD_NODE', // ADDED
   /** Update a specific parameter of a node. */
   UPDATE_PARAMETER = 'UPDATE_PARAMETER',
   /** Request an offline render of the current graph. */
@@ -42,6 +44,14 @@ export enum WorkletMessageType {
   NODE_ERROR = 'NODE_ERROR', // Added for specific node errors
   /** Reports current RMS or peak levels for visualization. */
   METER_UPDATE = 'METER_UPDATE', // Example for VU meters
+  /** Confirms a node was added and provides its (potentially modified) instance. */
+  NODE_ADDED = 'NODE_ADDED', // ADDED
+  /** Confirms a node was removed. */
+  NODE_REMOVED = 'NODE_REMOVED', // ADDED
+  /** Confirms a parameter was updated. */
+  PARAMETER_UPDATED = 'PARAMETER_UPDATED', // ADDED
+  /** Provides the full updated graph from the worklet. */
+  GRAPH_UPDATED = 'GRAPH_UPDATED', // ADDED
 }
 
 // === Audio Node and Parameter Descriptors ===
@@ -78,6 +88,13 @@ export interface ParameterDefinition<T = number> {
 export type ParameterValue = string | number | boolean;
 
 /**
+ * Defines the structure for parameter definitions for each node type.
+ * This will be an object where keys are NodeType and values are objects
+ * mapping parameter IDs to their definitions.
+ */
+export type NodeParameterDefinitions = Record<NodeType, Record<string, ParameterDefinition<ParameterValue>>>;
+
+/**
  * Describes an instance of an audio node in the graph.
  */
 export interface AudioNodeInstance {
@@ -109,16 +126,9 @@ export type RoutingMatrix = number[][][]; // channel -> sourceNode -> destNode -
  */
 export interface AudioGraph {
   nodes: AudioNodeInstance[];
-  /**
-   * Adjacency matrix for connections, or a list of explicit connections.
-   * For an MFN, the routingMatrix handles connections, but explicit connections
-   * might be useful for defining a primary signal flow before feedback.
-   * For now, we'll rely on the routingMatrix.
-   */
-  // connections: { sourceNodeId: string; destNodeId: string; outputPort?: string; inputPort?: string }[];
-  routingMatrix: RoutingMatrix;
+  routingMatrix: RoutingMatrix; // Ensure this is used instead of 'connections'
   outputChannels: number; // Number of output channels for the graph
-  masterGain: number; // Overall master gain
+  masterGain: number; // Overall master gain, ensure this is used instead of 'masterVolume'
 }
 
 // === Message Payloads ===
@@ -139,6 +149,11 @@ export interface UpdateGraphMessage {
   payload: {
     graph: AudioGraph;
   };
+}
+
+export interface AddNodeMessage { // ADDED
+  type: MainThreadMessageType.ADD_NODE;
+  payload: { nodeInstance: AudioNodeInstance }; // Changed payload structure
 }
 
 export interface UpdateParameterMessage {
@@ -173,9 +188,16 @@ export interface CheckProcessorStatusMessage {
   payload?: null; // No payload needed for this message
 }
 
+// ADDED: Interface for ADD_NODE message
+export interface AddNodeMessage {
+  type: MainThreadMessageType.ADD_NODE;
+  payload: { nodeInstance: AudioNodeInstance }; // Ensured payload is an object
+}
+
 export type MainThreadMessage =
   | InitProcessorMessage
   | UpdateGraphMessage
+  | AddNodeMessage // ADDED
   | UpdateParameterMessage
   | RenderOfflineMessage
   | SetOutputChannelsMessage
@@ -190,111 +212,108 @@ export interface ProcessorReadyMessage {
   type: WorkletMessageType.PROCESSOR_READY;
   payload?: {
     // any initial data if needed
+    message?: string; // Optional: for consistency if other messages have it
   };
 }
 
-export interface DataAvailableMessage<T = unknown> {
+export interface NodeAddedMessage { // ADDED
+  type: WorkletMessageType.NODE_ADDED;
+  payload: AudioNodeInstance;
+}
+
+export interface NodeRemovedMessage { // ADDED
+  type: WorkletMessageType.NODE_REMOVED;
+  payload: { nodeId: string };
+}
+
+export interface ParameterUpdatedMessage { // ADDED
+  type: WorkletMessageType.PARAMETER_UPDATED;
+  payload: {
+    nodeId: string;
+    parameterId: string;
+    value: ParameterValue;
+  };
+}
+
+export interface GraphUpdatedMessage { // ADDED
+  type: WorkletMessageType.GRAPH_UPDATED;
+  payload: AudioGraph;
+}
+
+export interface WorkletErrorMessage { // To ensure consistency for error payloads
+  type: WorkletMessageType.WORKLET_ERROR | WorkletMessageType.NODE_ERROR;
+  payload: {
+    message: string;
+    nodeId?: string; // Optional, if error is specific to a node
+  };
+}
+
+
+export interface DataAvailableMessage<T = unknown> { // Ensure T is defined here
   type: WorkletMessageType.DATA_AVAILABLE;
   payload: {
     dataType: string; // e.g., 'offlineRenderComplete', 'analysisData'
     data: T; // The actual data, e.g., an ArrayBuffer for audio
+    message?: string; // Optional: for consistency
   };
 }
 
-export interface WorkletErrorMessage {
-  type: WorkletMessageType.WORKLET_ERROR;
-  payload: {
-    message: string;
-    error?: unknown; // Can include the error object itself
-  };
-}
-
-export interface NodeErrorMessage { // Added interface for NODE_ERROR message
-  type: WorkletMessageType.NODE_ERROR;
-  payload: {
-    nodeId: string;
-    error: string;
-  };
-}
-
-export interface MeterUpdateMessage {
-  type: WorkletMessageType.METER_UPDATE;
-  payload: {
-    levels: number[][]; // channel -> [rms, peak] or similar
-  };
-}
+// Add other specific message types if needed, e.g., for METER_UPDATE
 
 export type WorkletMessage =
   | ProcessorReadyMessage
   | DataAvailableMessage
-  | WorkletErrorMessage
-  | NodeErrorMessage // Added to union type
-  | MeterUpdateMessage;
+  | WorkletErrorMessage // Use the more specific error type
+  | NodeAddedMessage // ADDED
+  | NodeRemovedMessage // ADDED
+  | ParameterUpdatedMessage // ADDED
+  | GraphUpdatedMessage; // ADDED
+  // Add MeterUpdateMessage etc. if they have specific payloads
 
-// === Example Parameter Definitions for Specific Node Types ===
-// These could be further refined or generated.
 
-export interface GainParams {
-  gain: ParameterDefinition<number>; // Typically 0-1, or dB
-}
-
-export interface DelayParams {
-  delayTime: ParameterDefinition<number>; // In seconds
-  feedback: ParameterDefinition<number>; // 0-1
-  mix: ParameterDefinition<number>; // 0-1 (dry/wet)
-}
-
-export type BiquadFilterType =
-  | 'lowpass'
-  | 'highpass'
-  | 'bandpass'
-  | 'lowshelf'
-  | 'highshelf'
-  | 'peaking'
-  | 'notch'
-  | 'allpass';
-
-export interface BiquadParams {
-  type: ParameterDefinition<BiquadFilterType>;
-  frequency: ParameterDefinition<number>; // Hz
-  Q: ParameterDefinition<number>; // Quality factor
-  gain: ParameterDefinition<number>; // dB (for lowshelf, highshelf, peaking)
-}
-
-// Add more specific parameter interfaces as new node types are defined.
-
-/**
- * A map of all known parameter definitions for each node type.
- * Useful for UI generation and validation.
- */
-export type NodeParameterDefinitions = {
-  [K in NodeType]?: K extends 'gain'
-    ? GainParams
-    : K extends 'delay'
-    ? DelayParams
-    : K extends 'biquad'
-    ? BiquadParams
-    // Add other node types here
-    : Record<string, ParameterDefinition<any>>;
-};
-
-// Placeholder for now, to be populated as kernels are defined.
+// Placeholder for actual node parameter definitions
+// This would typically be in its own file or a more structured part of your audio engine code.
 export const NODE_PARAMETER_DEFINITIONS: NodeParameterDefinitions = {
   gain: {
-    gain: { id: 'gain', label: 'Gain', type: 'float', minValue: 0, maxValue: 1, defaultValue: 0.7, unit: '' },
+    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 1, minValue: 0, maxValue: 2, unit: '' },
   },
   delay: {
-    delayTime: { id: 'delayTime', label: 'Delay Time', type: 'float', minValue: 0, maxValue: 2, defaultValue: 0.5, unit: 's' },
-    feedback: { id: 'feedback', label: 'Feedback', type: 'float', minValue: 0, maxValue: 1, defaultValue: 0.3, unit: '' },
-    mix: { id: 'mix', label: 'Mix', type: 'float', minValue: 0, maxValue: 1, defaultValue: 0.5, unit: '' },
+    delayTime: { id: 'delayTime', label: 'Delay Time', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 2, unit: 's' },
+    feedback: { id: 'feedback', label: 'Feedback', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '' },
   },
   biquad: {
-    type: { id: 'type', label: 'Filter Type', type: 'enum', defaultValue: 'lowpass', enumValues: ['lowpass', 'highpass', 'bandpass', 'lowshelf', 'highshelf', 'peaking', 'notch', 'allpass']},
-    frequency: { id: 'frequency', label: 'Frequency', type: 'float', minValue: 20, maxValue: 20000, defaultValue: 1000, unit: 'Hz' },
-    Q: { id: 'Q', label: 'Q', type: 'float', minValue: 0.0001, maxValue: 100, defaultValue: 1, unit: '' },
-    gain: { id: 'gain', label: 'Gain (shelf/peak)', type: 'float', minValue: -40, maxValue: 40, defaultValue: 0, unit: 'dB' },
-  }
-  // ... other nodes
+    frequency: { id: 'frequency', label: 'Frequency', type: 'float', defaultValue: 1000, minValue: 20, maxValue: 20000, unit: 'Hz' },
+    q: { id: 'q', label: 'Q', type: 'float', defaultValue: 1, minValue: 0.1, maxValue: 20, unit: '' },
+    type: { id: 'type', label: 'Filter Type', type: 'enum', defaultValue: 'lowpass', enumValues: ['lowpass', 'highpass', 'bandpass', 'notch', 'allpass', 'lowshelf', 'highshelf', 'peaking'] },
+    gain: { id: 'gain', label: 'Gain (Shelving/Peaking)', type: 'float', defaultValue: 0, minValue: -24, maxValue: 24, unit: 'dB' },
+  },
+  oscillator: {
+    frequency: { id: 'frequency', label: 'Frequency', type: 'float', defaultValue: 440, minValue: 20, maxValue: 20000, unit: 'Hz' },
+    type: { id: 'type', label: 'Waveform', type: 'enum', defaultValue: 'sine', enumValues: ['sine', 'square', 'sawtooth', 'triangle'] },
+    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.7, minValue: 0, maxValue: 1, unit: '' },
+  },
+  noise: {
+    type: { id: 'type', label: 'Noise Type', type: 'enum', defaultValue: 'white', enumValues: ['white', 'pink', 'brownian'] },
+    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '' },
+  },
+  input_mixer: { // Input mixer might not have user-configurable params other than channel routing
+    masterGain: { id: 'masterGain', label: 'Input Master Gain', type: 'float', defaultValue: 1, minValue: 0, maxValue: 1 }
+  },
+  output_mixer: { // Output mixer might not have user-configurable params other than channel routing
+    masterGain: { id: 'masterGain', label: 'Output Master Gain', type: 'float', defaultValue: 1, minValue: 0, maxValue: 1 }
+  },
+};
+
+// Example of a specific parameter definition for a gain node
+export const GainNodeParams: Record<string, ParameterDefinition> = {
+  gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 1, minValue: 0, maxValue: 1, unit: 'linear' },
+};
+
+// Example for a delay node
+export const DelayNodeParams: Record<string, ParameterDefinition> = {
+  delayTime: { id: 'delayTime', label: 'Delay Time', type: 'float', defaultValue: 0.5, minValue: 0.01, maxValue: 2.0, unit: 's' },
+  feedback: { id: 'feedback', label: 'Feedback', type: 'float', defaultValue: 0.4, minValue: 0, maxValue: 0.95, unit: '' },
+  mix: { id: 'mix', label: 'Mix', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '' },
 };
 
 console.log('Audio schema loaded.'); // For quick verification during development

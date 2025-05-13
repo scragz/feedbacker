@@ -1,17 +1,43 @@
-import { useState, useEffect, useCallback } from 'react';
-import { initializeAudioSystem, ensureAudioContextResumed, getAudioContext, getMFNWorkletNode } from './audio';
-import type { AudioGraph, AudioNodeInstance, NodeType, ParameterValue, ParameterDefinition, WorkletMessage } from './audio/schema';
-import { MainThreadMessageType, NODE_PARAMETER_DEFINITIONS, WorkletMessageType as WorkletMsgTypeEnum } from './audio/schema';
-import { createEmptyRoutingMatrix } from './audio/matrix';
-
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { MantineProvider, Text, MantineThemeOverride } from '@mantine/core'; // Ensure Text is imported
 import Pedalboard from './components/Pedalboard/Pedalboard';
 import Header from './components/Header/Header';
-import Controls from './components/Controls/Controls';
+import Controls, { ControlsProps } from './components/Controls/Controls'; // Import ControlsProps
 import NodeList from './components/NodeList/NodeList';
 import NodeEditor from './components/NodeEditor/NodeEditor';
-import StatusDisplay from './components/StatusDisplay/StatusDisplay';
+import StatusDisplay, { StatusDisplayProps } from './components/StatusDisplay/StatusDisplay'; // Import StatusDisplayProps
+import { MFNWorkletNode, setupAudioWorklet } from './audio';
+import type {
+  AudioGraph,
+  AudioNodeInstance,
+  NodeType,
+  MainThreadMessage,
+  WorkletMessage,
+  ParameterValue,
+  InitProcessorMessage,
+  UpdateParameterMessage,
+  AddNodeMessage, // Correctly import AddNodeMessage
+  NodeAddedMessage,
+  NodeRemovedMessage,
+  ParameterUpdatedMessage,
+  GraphUpdatedMessage,
+  WorkletErrorMessage,
+} from './audio/schema';
+import { MainThreadMessageType, WorkletMessageType, NODE_PARAMETER_DEFINITIONS } from './audio/schema';
 
-const MAX_CHANNELS = 8;
+const initialGraph: AudioGraph = {
+  nodes: [],
+  routingMatrix: [],
+  masterGain: 0.75,
+  outputChannels: 2,
+};
+
+const MAX_CHANNELS = 2; // Default to stereo, ensure this matches worklet and context
+
+// Define Mantine theme override for dark mode
+const theme: MantineThemeOverride = {
+  colorScheme: 'dark',
+};
 
 function App() {
   const [audioInitialized, setAudioInitialized] = useState(false);
@@ -20,224 +46,262 @@ function App() {
   const [processorReady, setProcessorReady] = useState(false);
   const [initMessageSent, setInitMessageSent] = useState(false);
   const [checkStatusSent, setCheckStatusSent] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [audioGraph, setAudioGraph] = useState<AudioGraph>(initialGraph);
 
-  const [audioGraph, setAudioGraph] = useState<AudioGraph>(() => {
-    const initialNodes: AudioNodeInstance[] = [
-      { id: 'system_input', type: 'input_mixer', parameters: {} },
-      { id: 'system_output', type: 'output_mixer', parameters: {} },
-    ];
-    const numChannels = 2;
-    return {
-      nodes: initialNodes,
-      routingMatrix: createEmptyRoutingMatrix(initialNodes.length, numChannels),
-      outputChannels: numChannels,
-      masterGain: 1.0,
-    };
-  });
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null); // Use AudioWorkletNode type
 
   useEffect(() => {
-    const initAudio = async () => {
-      try {
-        await initializeAudioSystem();
-        setAudioInitialized(true);
-        const context = getAudioContext();
-        setAudioContextState(context.state);
-        console.log('[App.tsx] Audio system core initialized.');
+    let isMounted = true;
+    if (!audioContextRef.current) {
+      const initializeAudio = async () => {
+        try {
+          const context = new AudioContext();
+          if (isMounted) setAudioContextState(context.state);
+          context.onstatechange = () => {
+            if (isMounted) setAudioContextState(context.state);
+          };
 
-        const workletNode = getMFNWorkletNode();
-        if (workletNode) {
-          workletNode.port.onmessage = (event: MessageEvent<WorkletMessage>) => {
-            if (event.data.type === WorkletMsgTypeEnum.PROCESSOR_READY) {
-              setProcessorReady(true);
-              console.log('[App.tsx] MFNProcessor reported READY.');
-            } else if (event.data.type === WorkletMsgTypeEnum.NODE_ERROR) { // Removed redundant payload check
-              console.error(`[App.tsx] Node Error from Worklet: Node ID ${event.data.payload.nodeId}, Message: ${event.data.payload.error}`);
-              setAudioError(`Node Error: ${event.data.payload.nodeId} - ${event.data.payload.error}`);
-            } else if (event.data.type === WorkletMsgTypeEnum.WORKLET_ERROR) { // Removed redundant payload check
-              console.error(`[App.tsx] General Worklet Error: ${event.data.payload.message}`);
-              setAudioError(`Worklet Error: ${event.data.payload.message}`);
+          await setupAudioWorklet(context);
+          // Use the correct MFNWorkletNode constructor if it's a custom class extending AudioWorkletNode
+          // For now, assuming MFNWorkletNode is a type alias or setupAudioWorklet handles registration
+          const mfnNode = new AudioWorkletNode(context, 'mfn-processor', {
+            numberOfInputs: 1,
+            numberOfOutputs: 1,
+            outputChannelCount: [MAX_CHANNELS],
+            processorOptions: { maxChannels: MAX_CHANNELS, sampleRate: context.sampleRate },
+          });
+
+          mfnNode.connect(context.destination);
+
+          mfnNode.port.onmessage = (event: MessageEvent<WorkletMessage>) => {
+            if (!isMounted) return;
+            const { type, payload } = event.data;
+            console.log('[App.tsx] Received message from worklet:', type, payload);
+
+            switch (type) {
+              case WorkletMessageType.PROCESSOR_READY:
+                if (isMounted) setProcessorReady(true);
+                console.log('[App.tsx] Audio processor is ready.');
+                break;
+              case WorkletMessageType.NODE_ADDED:
+                if (isMounted && payload) {
+                  const nodeAddedPayload = payload as NodeAddedMessage['payload'];
+                  setAudioGraph(prevGraph => ({
+                    ...prevGraph,
+                    nodes: [...prevGraph.nodes, nodeAddedPayload],
+                  }));
+                }
+                break;
+              case WorkletMessageType.NODE_REMOVED:
+                if (isMounted && payload) {
+                  const nodeRemovedPayload = payload as NodeRemovedMessage['payload'];
+                  setAudioGraph(prevGraph => ({
+                    ...prevGraph,
+                    nodes: prevGraph.nodes.filter(n => n.id !== nodeRemovedPayload.nodeId),
+                  }));
+                }
+                break;
+              case WorkletMessageType.PARAMETER_UPDATED:
+                if (isMounted && payload) {
+                  const paramUpdatedPayload = payload as ParameterUpdatedMessage['payload'];
+                  setAudioGraph(prevGraph => ({
+                    ...prevGraph,
+                    nodes: prevGraph.nodes.map(n =>
+                      n.id === paramUpdatedPayload.nodeId
+                        ? { ...n, parameters: { ...n.parameters, [paramUpdatedPayload.parameterId]: paramUpdatedPayload.value } }
+                        : n
+                    ),
+                  }));
+                }
+                break;
+              case WorkletMessageType.GRAPH_UPDATED:
+                if (isMounted && payload) {
+                  setAudioGraph(payload as GraphUpdatedMessage['payload']);
+                }
+                break;
+              case WorkletMessageType.WORKLET_ERROR:
+              case WorkletMessageType.NODE_ERROR:
+                if (isMounted && payload) {
+                  const errorPayload = payload as WorkletErrorMessage['payload'];
+                  setAudioError(errorPayload.message);
+                  console.error('[App.tsx] Worklet Error:', errorPayload.message);
+                }
+                break;
+              default:
+                console.warn('[App.tsx] Received unknown message type from worklet:', type);
             }
           };
-        } else {
-          console.error('[App.tsx] MFNWorkletNode not available after audio system initialization.');
-          setAudioError('MFNWorkletNode not available.');
+
+          audioContextRef.current = context;
+          workletNodeRef.current = mfnNode;
+          if (isMounted) setAudioInitialized(true);
+
+        } catch (error) {
+          console.error('Error initializing audio:', error);
+          if (isMounted) setAudioError(error instanceof Error ? error.message : String(error));
         }
-
-        const context = getAudioContext(); // Re-get context in case it was recreated
-        context.onstatechange = () => {
-          setAudioContextState(context.state);
-          console.log(`[App.tsx] AudioContext state changed to: ${context.state}`);
-        };
-
-      } catch (error) {
-        console.error('[App.tsx] Failed to initialize audio system:', error);
-        setAudioError((error as Error).message || 'Unknown audio initialization error');
-        try {
-          const context = getAudioContext();
-          setAudioContextState(context.state);
-        } catch (contextError) {
-          console.warn('[App.tsx] Could not get AudioContext state after init error:', contextError);
-        }
-      }
-    };
-
-    void initAudio();
-
+      };
+      void initializeAudio();
+    }
     return () => {
-      try {
-        const context = getAudioContext();
-        context.onstatechange = null;
-        const workletNode = getMFNWorkletNode();
-        if (workletNode) {
-          workletNode.port.onmessage = null;
-        }
-      } catch (e) {
-        console.warn('[App.tsx] Could not clean up audio context listener:', e);
+      isMounted = false;
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        // audioContextRef.current.close(); // Consider implications before enabling
       }
     };
+
   }, []);
 
   useEffect(() => {
-    if (audioInitialized && audioContextState === 'running' && !checkStatusSent) {
-      const currentWorkletNode = getMFNWorkletNode();
-      if (currentWorkletNode) { // Explicit check for worklet node
-        console.log('[App.tsx] Context running, audio initialized, sending CHECK_PROCESSOR_STATUS.');
-        currentWorkletNode.port.postMessage({
-          type: MainThreadMessageType.CHECK_PROCESSOR_STATUS,
-        });
-        setCheckStatusSent(true);
-      } else {
-        console.warn('[App.tsx] CHECK_PROCESSOR_STATUS not sent: WorkletNode not available yet.');
-      }
+    if (audioContextRef.current?.state === 'running' && workletNodeRef.current && !processorReady && !checkStatusSent) {
+      console.log('[App.tsx] Audio context running, sending CHECK_PROCESSOR_STATUS');
+      workletNodeRef.current.port.postMessage({ type: MainThreadMessageType.CHECK_PROCESSOR_STATUS });
+      setCheckStatusSent(true);
     }
-  }, [audioContextState, checkStatusSent, audioInitialized]);
+  }, [audioContextState, processorReady, checkStatusSent]);
 
   useEffect(() => {
-    if (audioInitialized && audioContextState === 'running' && processorReady && !initMessageSent) {
-      const currentContext = getAudioContext(); // Ensure we have the latest context reference
-      const currentWorkletNode = getMFNWorkletNode();
-      if (currentContext && currentWorkletNode) { // Explicit checks
-        console.log('[App.tsx] Processor ready, sending INIT_PROCESSOR.');
-        currentWorkletNode.port.postMessage({
-          type: MainThreadMessageType.INIT_PROCESSOR,
-          payload: {
-            graph: audioGraph,
-            sampleRate: currentContext.sampleRate,
+    if (processorReady && workletNodeRef.current && audioContextRef.current && !initMessageSent) {
+      console.log('[App.tsx] Processor ready, sending INIT_PROCESSOR with graph:', audioGraph);
+      const initMessage: InitProcessorMessage = {
+        type: MainThreadMessageType.INIT_PROCESSOR,
+        payload: {
+          graph: audioGraph,
+          sampleRate: audioContextRef.current.sampleRate,
+          maxChannels: MAX_CHANNELS,
+        },
+      };
+      workletNodeRef.current.port.postMessage(initMessage);
       setInitMessageSent(true);
     }
-  }, [processorReady, audioGraph, initMessageSent, audioContextState, audioInitialized]);
+  }, [processorReady, initMessageSent, audioGraph]);
 
   const handleResumeAudio = useCallback(async () => {
-    try {
-      await ensureAudioContextResumed();
-      const context = getAudioContext();
-      setAudioContextState(context.state);
-      if (context.state === 'running') {
-        setAudioError(null);
-      }
-    } catch (err) {
-      console.warn('[App.tsx] Error resuming audio context on click:', err);
-      setAudioError((err as Error).message || 'Failed to resume audio context.');
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
       try {
-        const context = getAudioContext();
-        setAudioContextState(context.state);
-      } catch (contextError) {
-        console.warn('[App.tsx] Could not get AudioContext state after resume error:', contextError);
+        await audioContextRef.current.resume();
+        console.log('[App.tsx] Audio context resumed.');
+      } catch (error) {
+        console.error('Error resuming audio context:', error);
+        setAudioError(error instanceof Error ? error.message : String(error));
       }
     }
   }, []);
 
   const handleAddNode = (type: NodeType) => {
-    if (!audioInitialized || !processorReady || !initMessageSent) {
-      setAudioError("Audio system not ready to add nodes (or initial graph not sent).");
-      console.warn('[App.tsx] Add node aborted: audio system not ready.', { audioInitialized, processorReady, initMessageSent });
+    if (!workletNodeRef.current || !audioContextRef.current) {
+      setAudioError("Worklet node or audio context not available to add node.");
       return;
     }
-    const workletNode = getMFNWorkletNode();
-    if (!workletNode) {
-      setAudioError("MFNWorkletNode not available to add nodes.");
-      console.warn('[App.tsx] Add node aborted: MFNWorkletNode not found.');
-      return;
+    const newNodeId = `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const nodeParamDefinitionsMap = NODE_PARAMETER_DEFINITIONS[type];
+    const defaultParameters: Record<string, ParameterValue> = {};
+
+    if (nodeParamDefinitionsMap) {
+      for (const paramKey in nodeParamDefinitionsMap) {
+        const paramDef = nodeParamDefinitionsMap[paramKey];
+        defaultParameters[paramDef.id] = paramDef.defaultValue;
+      }
     }
 
-    setAudioGraph(prevGraph => {
-      const newNodeId = `${type}_node_${Date.now()}`;
-      const newNodeParams: Record<string, ParameterValue | undefined> = {};
+    const newNodeInstance: AudioNodeInstance = {
+      id: newNodeId,
+      type,
+      parameters: defaultParameters,
+    };
 
-      const nodeParamDefinitionsGroup = NODE_PARAMETER_DEFINITIONS[type];
-      if (nodeParamDefinitionsGroup) {
-        const params = nodeParamDefinitionsGroup as Record<string, ParameterDefinition<ParameterValue>>;
-        for (const paramKey in params) {
-          if (Object.prototype.hasOwnProperty.call(params, paramKey)) {
-            const paramDef = params[paramKey];
-            newNodeParams[paramDef.id] = paramDef.defaultValue;
-          }
-        }
-      }
+    setAudioGraph(prevGraph => ({
+      ...prevGraph,
+      nodes: [...prevGraph.nodes, newNodeInstance],
+    }));
 
-      const newNode: AudioNodeInstance = {
-        id: newNodeId,
-        type: type,
-        parameters: newNodeParams,
-      };
+    const message: AddNodeMessage = {
+      type: MainThreadMessageType.ADD_NODE,
+      payload: { nodeInstance: newNodeInstance }, // Corrected payload structure
+    };
+    workletNodeRef.current.port.postMessage(message);
+    console.log('[App.tsx] Sent ADD_NODE message for new node:', newNodeInstance);
+  };
 
-      const updatedNodes = [...prevGraph.nodes, newNode];
-      const newNumNodes = updatedNodes.length;
+  const handleSelectNode = useCallback((nodeId: string | null) => {
+    setSelectedNodeId(nodeId);
+    console.log('[App.tsx] Selected node:', nodeId);
+  }, []);
 
-      const updatedRoutingMatrix = createEmptyRoutingMatrix(newNumNodes, prevGraph.outputChannels);
-
-      // Preserve existing connections in the larger matrix
-      for (let c = 0; c < prevGraph.outputChannels; c++) {
-        for (let i = 0; i < prevGraph.nodes.length; i++) { // Iterate up to old number of nodes
-          for (let j = 0; j < prevGraph.nodes.length; j++) { // Iterate up to old number of nodes
-            if (prevGraph.routingMatrix[c]?.[i]?.[j] !== undefined) {
-               updatedRoutingMatrix[c][i][j] = prevGraph.routingMatrix[c][i][j];
-            }
-          }
-        }
-      }
-
-      const updatedGraph: AudioGraph = {
-        ...prevGraph,
-        nodes: updatedNodes,
-        routingMatrix: updatedRoutingMatrix,
-      };
-
-      console.log('[App.tsx] Adding node, sending UPDATE_GRAPH:', updatedGraph);
-      workletNode.port.postMessage({
-        type: MainThreadMessageType.UPDATE_GRAPH,
+  const handleParameterUpdate = useCallback((nodeId: string, paramId: string, value: ParameterValue) => {
+    if (workletNodeRef.current) {
+      console.log(`[App.tsx] Updating parameter: Node ${nodeId}, Param ${paramId}, Value ${value}`);
+      const message: UpdateParameterMessage = {
+        type: MainThreadMessageType.UPDATE_PARAMETER,
         payload: {
-          graph: updatedGraph,
+          nodeId,
+          parameterId: paramId,
+          value,
         },
-      });
+      };
+      workletNodeRef.current.port.postMessage(message);
+      setAudioGraph(prevGraph => ({
+        ...prevGraph,
+        nodes: prevGraph.nodes.map(n =>
+          n.id === nodeId
+            ? { ...n, parameters: { ...n.parameters, [paramId]: value } }
+            : n
+        ),
+      }));
+    } else {
+      setAudioError("Worklet node not available to update parameter.");
+    }
+  }, []);
 
-      return updatedGraph;
-    });
+  const selectedNode = audioGraph.nodes.find(node => node.id === selectedNodeId) ?? null;
+
+  // Props for StatusDisplay
+  const statusDisplayProps: StatusDisplayProps = {
+    error: audioError,
+    status: audioContextState,
+    onResume: handleResumeAudio,
+  };
+
+  // Props for Controls
+  const controlsProps: ControlsProps = {
+    onAddNode: handleAddNode,
+    audioContextState: audioContextState,
+    onAudioResume: handleResumeAudio,
+    // Add any other props Controls might need, e.g., isProcessorReady: processorReady
   };
 
   return (
-    <Pedalboard>
-      <Header />
-      <StatusDisplay
-        audioError={audioError}
-        audioInitialized={audioInitialized}
-        audioContextState={audioContextState}
-        processorReady={processorReady}
-        initMessageSent={initMessageSent}
-      />
-      {/* Render controls only when the full audio pipeline is ready */}
-      {audioInitialized && processorReady && initMessageSent && (
-        <>
-          <Controls
-            onAddNode={handleAddNode}
-            audioContextState={audioContextState}
-            onAudioResume={() => { void handleResumeAudio(); }} // MODIFIED: Wrap async call
-          />
-          <NodeList nodes={audioGraph.nodes} />
-          <NodeEditor />
-        </>
-      )}
-    </Pedalboard>
+    <MantineProvider theme={theme} withGlobalStyles withNormalizeCSS>
+      <Pedalboard>
+        <Header />
+        <StatusDisplay {...statusDisplayProps} />
+        {!audioInitialized ? (
+          <Text>Initializing Audio...</Text>
+        ) : !processorReady && audioContextRef.current?.state === 'running' ? (
+          <Text>Audio Initialized. Waiting for Processor Ready Signal...</Text>
+        ) : !processorReady ? (
+           <Text>Audio Initialized. Waiting for audio context to run to check processor status...</Text>
+        ) : (
+          <>
+            <Controls {...controlsProps} />
+            <NodeList
+              nodes={audioGraph.nodes}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={handleSelectNode}
+            />
+            {selectedNode && (
+              <NodeEditor
+                key={selectedNode.id}
+                selectedNode={selectedNode}
+                onParameterChange={handleParameterUpdate}
+              />
+            )}
+          </>
+        )}
+      </Pedalboard>
+    </MantineProvider>
   );
 }
 
