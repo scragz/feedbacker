@@ -6,6 +6,24 @@
   --app-shell-header-offset: 200px;
 }
 
+.appHeaderContainer {
+  height: 60px; /* Or your header's height */
+  background-color: var(--mantine-color-dark-7);
+  border-bottom: 1px solid var(--mantine-color-dark-5);
+  display: flex;
+  align-items: center;
+}
+
+.transportBarContainer {
+  background-color: var(--mantine-color-dark-6);
+  border-bottom: 1px solid var(--mantine-color-dark-4);
+}
+
+.innerAppShell {
+  /* Ensures the AppShell takes up the remaining vertical space */
+  height: 100%;
+}
+
 .header {
   background-color: var(--mantine-color-dark-7);
   border-bottom: 1px solid var(--mantine-color-dark-5);
@@ -25,9 +43,32 @@
 
 .navbar {
   background-color: var(--mantine-color-dark-7);
-  border-right: 1px solid var(--mantine-color-dark-5);
+  border-right: 1px solid var(--mantine-color-dark-4);
+  height: 100%; /* Fill available height */
+  overflow-y: auto;
 }
 
 .main {
+  background-color: var(--mantine-color-dark-8);
+}
+
+.mainContentPadded {
+  background-color: var(--mantine-color-dark-8); /* Or your desired background */
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--mantine-spacing-xs); /* Add some padding around the pedalboard */
+}
+
+.aside {
+  background-color: var(--mantine-color-dark-7);
+  border-left: 1px solid var(--mantine-color-dark-4);
+  height: 100%; /* Fill available height */
+  overflow-y: auto;
+}
+
+.mainContentArea {
+  flex: 1; /* Takes remaining vertical space */
+  overflow-y: auto; /* Allows scrolling for content that overflows */
+  padding: var(--mantine-spacing-md); /* Add some overall padding */
   background-color: var(--mantine-color-dark-8);
 }

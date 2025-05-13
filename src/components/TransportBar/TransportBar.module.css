@@ -1,0 +1,9 @@
+.transportBar {
+  background-color: var(--mantine-color-dark-6);
+  border-bottom: 1px solid var(--mantine-color-dark-4);
+}
+
+.chaosControl {
+  display: flex;
+  align-items: center;
+}

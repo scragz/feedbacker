@@ -1,69 +1,49 @@
-import { type DSPKernel, type NodeState } from './dsp-kernel';
-import type { AudioNodeInstance as SchemaAudioNodeInstance, ParameterValue } from '../schema'; // Removed NodeId, added ParameterValue
-
-export interface NoiseNodeParams {
-  type: 'white' | 'pink' | 'brownian';
-  gain: number;
-}
-
-export interface NoiseNodeInternalState { // Renamed for clarity
-  lastPinkValues?: number[];
-}
-
-// Helper to safely get typed parameters
-function getTypedParams(parameters: Record<string, ParameterValue | undefined>): NoiseNodeParams {
-  const typeParam = parameters.type;
-  const gainParam = parameters.gain;
-
-  // Check if typeParam is a valid NoiseNodeParams['type']
-  const isValidType = typeof typeParam === 'string' && ['white', 'pink', 'brownian'].includes(typeParam);
-
-  return {
-    type: isValidType ? (typeParam as NoiseNodeParams['type']) : 'white',
-    gain: typeof gainParam === 'number' ? gainParam : 0.5,
-  };
-}
+import type { AudioNodeInstance } from '../schema';
+import type { DSPKernel, NodeState } from './dsp-kernel';
 
 /**
- * Noise generation kernel.
+ * NoiseKernel: Generates white noise.
+ * Conforms to the DSPKernel functional type.
  */
 export const noiseKernel: DSPKernel = (
-  _inputs: Float32Array[], // Noise source has no audio inputs from other nodes in the graph
-  outputs: Float32Array[], // Output port 0: [channelIndex][sampleIndex]
-  node: SchemaAudioNodeInstance, // Full node instance, includes parameters
-  _blockSize: number, // frameLength is derived from outputs[0].length
-  _sampleRate: number, // sampleRate might be needed for some noise algorithms
-  numChannels: number, // Number of channels for this node\'s output
-  _nodeState: NodeState // Generic state, can cast to NoiseNodeInternalState if needed
+  _inputs: Float32Array[], // Noise ignores inputs
+  outputs: Float32Array[], // output port 0: [channelIndex][sampleIndex]
+  node: AudioNodeInstance,
+  _blockSize: number, // Block size is implicitly outputs[0][0]?.length
+  _sampleRate: number,
+  _numChannels: number, // numChannels is implicitly outputs[0]?.length
+  _nodeState: NodeState, // Noise is stateless for now
 ): void => {
-  // Use the helper for safer parameter access
-  const { type, gain } = getTypedParams(node.parameters);
+  // Use the channelCount from the node instance if available, otherwise default to the number of output buffers provided.
+  const nodeEffectiveChannelCount = node.channelCount ?? outputs.length;
+  const samplesPerChannel = outputs[0]?.length ?? 0;
 
-  if (numChannels === 0 || outputs.length === 0) return;
+  // console.log(`[noiseKernel ${node.id}] Processing. Node Channels: ${nodeEffectiveChannelCount}, Output Channels: ${outputs.length}, Samples: ${samplesPerChannel}`);
 
-  const frameLength = outputs[0]?.length ?? 0;
-  if (frameLength === 0) return;
+  if (samplesPerChannel === 0) {
+    // console.warn(`[noiseKernel ${node.id}] No samples to process.`);
+    return;
+  }
 
-  // The DSPKernel type expects outputs as Float32Array[], where each element is a channel.
-  // The mfn-processor provides nodeOutputBuffers as Map<string, Float32Array[]>
-  // where the Float32Array[] is [channel][sample]. This matches.
-
-  if (type === 'white') {
-    for (let ch = 0; ch < numChannels; ch++) {
-      const outputBuffer = outputs[ch];
-      // Removed redundant check for outputBuffer, as the loop structure implies its existence.
-      for (let i = 0; i < frameLength; i++) {
-        outputBuffer[i] = (Math.random() * 2 - 1) * gain;
-      }
+  // Fill the output buffers with white noise
+  // Respect the lesser of the node's intended channel count and the available output buffers
+  for (let channel = 0; channel < nodeEffectiveChannelCount && channel < outputs.length; channel++) {
+    const outputBuffer = outputs[channel];
+    for (let i = 0; i < samplesPerChannel; i++) {
+      outputBuffer[i] = Math.random() * 2 - 1; // White noise between -1 and 1
     }
-  } else {
-    for (let ch = 0; ch < numChannels; ch++) {
-      const outputBuffer = outputs[ch];
-      // Removed redundant check for outputBuffer.
-      outputBuffer.fill(0);
-    }
-    // console.warn(`[noiseKernel] Noise type \'${type}\' not yet implemented. Outputting silence.`);
+  }
+
+  // If the node is intended to have fewer channels than available output buffers,
+  // zero out the remaining output buffers to prevent stale data.
+  for (let channel = nodeEffectiveChannelCount; channel < outputs.length; channel++) {
+    const outputBuffer = outputs[channel];
+    outputBuffer.fill(0);
   }
 };
 
-export default noiseKernel;
+// Helper or specific functions related to noise, if any, can go here.
+// For example, a function to initialize state if noise were stateful.
+// export function createNoiseState(nodeId: string, sampleRate: number, channelCount: number): Record<string, any> {
+//   return { id: nodeId, sampleRate, channelCount, /* other state properties */ };
+// }

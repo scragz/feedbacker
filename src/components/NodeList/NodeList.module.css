@@ -21,17 +21,21 @@
   margin: 0;
   max-height: 200px; /* Example max height */
   overflow-y: auto; /* Scroll if content exceeds max height */
+  display: flex;
 }
 
 .listItem {
   background-color: #383838;
   color: #c0c0c0;
   padding: 8px 12px;
+  margin-top: 0;
   margin-bottom: var(--mantine-spacing-xs);
   border-radius: var(--mantine-radius-sm);
   border: 1px solid #484848;
   font-size: 0.9em;
   transition: background-color 0.15s ease;
+  width: 160px;
+  height: 160px;
 }
 
 .nodeButton {

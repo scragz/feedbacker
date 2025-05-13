@@ -1,11 +1,25 @@
 /**
- * Barrel file for exporting all DSP kernels.
+ * Barrel file for exporting all DSP kernels and a kernel registry.
  */
-import { noiseKernel as noiseKernelInstance } from './noise';
+import { noiseKernel } from './noise';
+import { processGain } from './gain';
+import { processDelay } from './delay';
+import { processBiquad } from './biquad';
+import { passthroughKernel } from './passthrough';
+import type { DSPKernel } from './dsp-kernel';
 
-export { processGain } from './gain';
-export { processDelay } from './delay';
-export { processBiquad } from './biquad';
-export { processPassthrough } from './passthrough';
-export const noiseKernel = noiseKernelInstance; // Exporting noise kernel directly
-export type { DSPKernel } from './dsp-kernel';
+// Export individual kernels if needed elsewhere
+export { processGain, processDelay, processBiquad, noiseKernel, passthroughKernel };
+
+// Create and export the kernel registry
+// export const kernelRegistry: Record<NodeType, DSPKernel> = {
+//   gain: processGain,
+//   delay: processDelay,
+//   biquad: processBiquad,
+//   noise: noiseKernel,
+//   oscillator: passthroughKernel, // Placeholder for oscillator
+//   input_mixer: passthroughKernel, // Placeholder for input_mixer
+//   output_mixer: passthroughKernel, // Placeholder for output_mixer
+// };
+
+export type { DSPKernel };

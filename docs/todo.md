@@ -72,13 +72,13 @@
 
 ## Phase 6 · UI Framework
 
-- [/] **Step 9: App shell & Mantine provider**
+- [x] **Step 9: App shell & Mantine provider**
 
   - **Task**: Replace default `App.tsx` with layout incl. theme toggle, sidebar for patch list, main workspace.
   - **Files**: `src/App.tsx`, `src/components/LayoutShell.tsx`, theme file.
   - **Dependencies**: Steps 1, 8
 
-- [ ] **Step 10: MatrixCanvas proto**
+- [x] **Step 10: MatrixCanvas proto**
 
   - **Task**:
     - Create `components/MatrixCanvas.tsx` rendering stacked channel grids on `<canvas>`; callbacks fire `graph.setWeight`.

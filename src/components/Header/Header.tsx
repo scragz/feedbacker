@@ -2,10 +2,14 @@ import React from 'react';
 import { Title } from '@mantine/core';
 import classes from './Header.module.css';
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  title: string;
+}
+
+const Header: React.FC<HeaderProps> = ({ title }) => {
   return (
-    <Title className={classes.header}>
-      Feedbacker
+    <Title order={3} className={classes.header}>
+      {title}
     </Title>
   );
 };

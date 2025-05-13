@@ -50,27 +50,8 @@ export function useAudioInitialization({
             case WorkletMessageType.PROCESSOR_READY:
               setProcessorReady(true);
               console.log('[useAudioInitialization.ts] Audio processor is ready.');
-              // Example: Accessing payload if it was defined for PROCESSOR_READY
-              // if (payload && 'sampleRate' in payload) {
-              //   console.log('Processor ready with sampleRate:', payload.sampleRate);
-              // }
-              break;
-            case WorkletMessageType.NODE_ADDED:
-              // Payload is non-optional for NODE_ADDED (AudioNodeInstance)
-              setAudioGraph(prevGraph => ({
-                ...prevGraph,
-                nodes: [...prevGraph.nodes, payload],
-              }));
-              break;
-            case WorkletMessageType.NODE_REMOVED:
-              // Payload is non-optional for NODE_REMOVED ({ nodeId: string })
-              setAudioGraph(prevGraph => ({
-                ...prevGraph,
-                nodes: prevGraph.nodes.filter(n => n.id !== payload.nodeId),
-              }));
               break;
             case WorkletMessageType.PARAMETER_UPDATED:
-              // Payload is non-optional for PARAMETER_UPDATED ({ nodeId: string, parameterId: string, value: ParameterValue })
               setAudioGraph(prevGraph => ({
                 ...prevGraph,
                 nodes: prevGraph.nodes.map(n =>
@@ -81,12 +62,17 @@ export function useAudioInitialization({
               }));
               break;
             case WorkletMessageType.GRAPH_UPDATED:
-              // Payload is non-optional for GRAPH_UPDATED (AudioGraph)
+              // This is the main way the graph should be updated from the worklet if it's the source of truth
               setAudioGraph(payload);
+              console.log('[useAudioInitialization.ts] Graph updated from worklet via GRAPH_UPDATED.');
+              break;
+            case WorkletMessageType.PROCESSOR_STATUS: // Added case
+              console.log('[useAudioInitialization.ts] Received PROCESSOR_STATUS:', payload);
+              setProcessorReady(payload.isInitialized);
+              // Optionally, you could also update other state based on payload.graphNodeCount
               break;
             case WorkletMessageType.WORKLET_ERROR:
-            case WorkletMessageType.NODE_ERROR:
-              // Payload is non-optional for WORKLET_ERROR/NODE_ERROR ({ message: string })
+            // case WorkletMessageType.NODE_ERROR: // NODE_ERROR was removed, WORKLET_ERROR covers it
               setAudioError(payload.message);
               console.error('[useAudioInitialization.ts] Worklet Error:', payload.message);
               break;
@@ -119,5 +105,5 @@ export function useAudioInitialization({
     };
   }, [setAudioContextState, setAudioError, setAudioGraph, setProcessorReady]);
 
-  return { audioContextRef, workletNodeRef, audioInitialized };
+  return { audioContextRef, workletNodeRef, audioInitialized, setAudioGraph };
 }

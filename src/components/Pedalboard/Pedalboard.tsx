@@ -3,14 +3,14 @@ import classes from './Pedalboard.module.css';
 import MatrixCanvas from '../MatrixCanvas'; // Import MatrixCanvas
 
 interface PedalboardProps {
-  children: React.ReactNode;
+  children?: React.ReactNode; // Make children optional
 }
 
 const Pedalboard: React.FC<PedalboardProps> = ({ children, ...props }) => {
   return (
     <div className={classes.pedalboard} {...props}>
-      {children}
-      <MatrixCanvas /> {/* Add MatrixCanvas here */}
+      {children} {/* Render children if provided */}
+      <MatrixCanvas />
     </div>
   );
 };

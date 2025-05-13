@@ -17,7 +17,9 @@ export enum MainThreadMessageType {
   /** Update the entire audio graph structure (nodes, connections). */
   UPDATE_GRAPH = 'UPDATE_GRAPH',
   /** Add a new node to the graph. */
-  ADD_NODE = 'ADD_NODE', // ADDED
+  ADD_NODE = 'ADD_NODE',
+  /** Remove a node from the graph. */
+  REMOVE_NODE = 'REMOVE_NODE', // Added REMOVE_NODE
   /** Update a specific parameter of a node. */
   UPDATE_PARAMETER = 'UPDATE_PARAMETER',
   /** Request an offline render of the current graph. */
@@ -28,6 +30,8 @@ export enum MainThreadMessageType {
   TRANSPORT_CONTROL = 'TRANSPORT_CONTROL', // Example, might not be needed if AudioContext handles it
   /** Message from main thread to check if processor is alive and ready. */
   CHECK_PROCESSOR_STATUS = 'CHECK_PROCESSOR_STATUS',
+  /** Set a global parameter that affects the entire processing (e.g., chaos level) */
+  SET_GLOBAL_PARAMETER = 'SET_GLOBAL_PARAMETER', // ADDED
 }
 
 /**
@@ -52,6 +56,8 @@ export enum WorkletMessageType {
   PARAMETER_UPDATED = 'PARAMETER_UPDATED', // ADDED
   /** Provides the full updated graph from the worklet. */
   GRAPH_UPDATED = 'GRAPH_UPDATED', // ADDED
+  /** Provides the processor status, e.g., initialization state, node count. */
+  PROCESSOR_STATUS = 'PROCESSOR_STATUS', // ADDED
 }
 
 // === Audio Node and Parameter Descriptors ===
@@ -106,6 +112,7 @@ export interface AudioNodeInstance {
   type: NodeType; // Type of DSP kernel to use
   label?: string; // Optional user-defined label for the node
   parameters: Record<string, ParameterValue | undefined>; // Current parameter values { paramId: value }
+  channelCount?: number; // ADDED: Number of channels for this node instance
   // Position for UI, not used by worklet directly but useful for graph state
   uiPosition?: { x: number; y: number };
 }
@@ -160,6 +167,12 @@ export interface AddNodeMessage { // ADDED
   payload: { nodeInstance: AudioNodeInstance }; // Changed payload structure
 }
 
+// ADDED: Interface for RemoveNodeMessage
+export interface RemoveNodeMessage {
+  type: MainThreadMessageType.REMOVE_NODE;
+  payload: { nodeId: NodeId };
+}
+
 export interface UpdateParameterMessage {
   type: MainThreadMessageType.UPDATE_PARAMETER;
   payload: {
@@ -192,6 +205,19 @@ export interface CheckProcessorStatusMessage {
   payload?: null; // No payload needed for this message
 }
 
+/**
+ * ADDED: Interface for setting a global parameter
+ * This could be for parameters that affect the whole graph or processor,
+ * like a global gain, chaos level, or other effects.
+ */
+export interface SetGlobalParameterMessage {
+  type: MainThreadMessageType.SET_GLOBAL_PARAMETER;
+  payload: {
+    parameterId: string; // ID of the global parameter
+    value: number | string | boolean; // Value to set, type depends on the parameter
+  };
+}
+
 // ADDED: Interface for ADD_NODE message
 export interface AddNodeMessage {
   type: MainThreadMessageType.ADD_NODE;
@@ -201,14 +227,16 @@ export interface AddNodeMessage {
 export type MainThreadMessage =
   | InitProcessorMessage
   | UpdateGraphMessage
-  | AddNodeMessage // ADDED
+  | AddNodeMessage
+  | RemoveNodeMessage // Added RemoveNodeMessage
   | UpdateParameterMessage
   | RenderOfflineMessage
   | SetOutputChannelsMessage
   /**
    * ADDED: New message type to the union
    */
-  | CheckProcessorStatusMessage;
+  | CheckProcessorStatusMessage
+  | SetGlobalParameterMessage; // ADDED
 
 // --- Worklet to Main Thread ---
 
@@ -252,6 +280,13 @@ export interface WorkletErrorMessage { // To ensure consistency for error payloa
   };
 }
 
+export interface ProcessorStatusMessage { // ADDED: For processor status updates
+  type: WorkletMessageType.PROCESSOR_STATUS;
+  payload: {
+    isInitialized: boolean; // Whether the processor is initialized
+    graphNodeCount: number | null; // Number of nodes in the graph, or null if unknown
+  };
+}
 
 export interface DataAvailableMessage<T = unknown> { // Ensure T is defined here
   type: WorkletMessageType.DATA_AVAILABLE;
@@ -271,7 +306,8 @@ export type WorkletMessage =
   | NodeAddedMessage // ADDED
   | NodeRemovedMessage // ADDED
   | ParameterUpdatedMessage // ADDED
-  | GraphUpdatedMessage; // ADDED
+  | GraphUpdatedMessage // ADDED
+  | ProcessorStatusMessage; // ADDED
   // Add MeterUpdateMessage etc. if they have specific payloads
 
 

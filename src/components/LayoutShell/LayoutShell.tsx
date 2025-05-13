@@ -1,22 +1,24 @@
-import { AppShell } from '@mantine/core';
-import React from 'react';
-import Header from '../Header/Header';
+import { Stack, Box } from '@mantine/core';
 import classes from './LayoutShell.module.css';
 
 interface LayoutShellProps {
-  children: React.ReactNode;
+  appHeader: React.ReactNode;
+  transportBar: React.ReactNode;
+  children: React.ReactNode; // Main content will go here
 }
 
-export default function LayoutShell({ children }: LayoutShellProps) {
+export function LayoutShell({
+  appHeader,
+  transportBar,
+  children,
+}: LayoutShellProps) {
   return (
-    <AppShell
-      className={classes.shell}
-    >
-      <AppShell.Header className={classes.header}>
-        <Header />
-      </AppShell.Header>
-
-      <AppShell.Main className={classes.main}>{children}</AppShell.Main>
-    </AppShell>
+    <Stack gap={0} style={{ height: '100vh' }}>
+      <Box className={classes.appHeaderContainer}>{appHeader}</Box>
+      <Box className={classes.transportBarContainer}>{transportBar}</Box>
+      <Box className={classes.mainContentArea}>{children}</Box>
+    </Stack>
   );
 }
+
+export default LayoutShell;

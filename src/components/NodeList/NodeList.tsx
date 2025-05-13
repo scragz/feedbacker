@@ -7,9 +7,10 @@ interface NodeListProps {
   nodes: AudioNodeInstance[];
   selectedNodeId: string | null; // ADDED: To indicate which node is selected
   onSelectNode: (nodeId: string | null) => void; // ADDED: Callback for when a node is clicked
+  onRemoveNode: (nodeId: string) => void; // ADDED: Callback for removing a node
 }
 
-const NodeList: React.FC<NodeListProps> = ({ nodes, selectedNodeId, onSelectNode }) => {
+const NodeList: React.FC<NodeListProps> = ({ nodes, selectedNodeId, onSelectNode, onRemoveNode }) => {
   return (
     <Paper p="md" shadow="xs" className={classes.nodeListContainer}>
       <Text size="lg" ta="center" mb="sm" className={classes.nodeListTitle}>Current Nodes</Text>
@@ -24,19 +25,23 @@ const NodeList: React.FC<NodeListProps> = ({ nodes, selectedNodeId, onSelectNode
                 // MODIFIED: Apply selected style and add onClick handler
                 className={`${classes.listItem} ${node.id === selectedNodeId ? classes.selectedItem : ''}`}
               >
-                {/* MODIFIED: Added braces to onClick handler */}
-                <UnstyledButton onClick={() => { onSelectNode(node.id); }} className={classes.nodeButton}>
-                  <Text fw={500}>{node.type.toUpperCase()} (ID: {node.id})</Text>
-                  {Object.keys(node.parameters).length > 0 && (
-                    <List listStyleType="disc" withPadding className={classes.nodeParameters}>
-                      {Object.entries(node.parameters).map(([paramId, value]) => (
-                        <List.Item key={paramId} className={classes.parameterItem}>
-                          {paramId}: {String(value)}
-                        </List.Item>
-                      ))}
-                    </List>
-                  )}
-                </UnstyledButton>
+                <div className={classes.nodeItemContainer}> {/* Added container for layout */}
+                  <UnstyledButton onClick={() => { onSelectNode(node.id); }} className={classes.nodeButton}>
+                    <Text fw={500}>{node.label ?? node.type.toUpperCase()} (ID: {node.id.substring(0,5)}...)</Text>
+                    {/* Removed parameter display from here, NodeInspector will handle it */}
+                  </UnstyledButton>
+                  {/* ADDED: Remove button */}
+                  <UnstyledButton
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent onSelectNode from firing
+                      onRemoveNode(node.id);
+                    }}
+                    className={classes.removeButton}
+                    title="Remove Node"
+                  >
+                    &#x2715; {/* Multiplication X sign as a simple icon */}
+                  </UnstyledButton>
+                </div>
               </List.Item>
             ))}
           </List>
