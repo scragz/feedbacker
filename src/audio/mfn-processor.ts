@@ -5,12 +5,12 @@
 
 // Restore and refine AudioWorklet global types
 declare global {
-  // eslint-disable-next-line no-var
-  var sampleRate: number;
-  // eslint-disable-next-line no-var
-  var currentTime: number;
-  // eslint-disable-next-line no-var
-  var currentFrame: number;
+
+  let sampleRate: number;
+
+  let currentTime: number;
+
+  let currentFrame: number;
 
   // Define a base interface for the processor instance
   interface AudioWorkletProcessor {
@@ -24,12 +24,11 @@ declare global {
 
   // Ensure this global AudioWorkletNodeOptions is what the constructor expects
   interface AudioWorkletNodeOptions {
-    processorOptions?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     numberOfInputs?: number;
     numberOfOutputs?: number;
     outputChannelCount?: number[];
     // Allow any other properties for flexibility
-    [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    [key: string]: unknown;
   }
 
   // Define the constructor signature for an AudioWorkletProcessor
@@ -188,6 +187,58 @@ class MFNProcessor extends AudioWorkletProcessor {
         this.port.postMessage({ type: WorkletMsgTypeEnum.PROCESSOR_READY });
         console.log('[MFNProcessor] Received CHECK_PROCESSOR_STATUS, sent PROCESSOR_READY.');
         break;
+      // ADDED: Case to handle ADD_NODE
+      case MainThreadMessageType.ADD_NODE: {
+        const { nodeInstance } = payload as { nodeInstance: AudioNodeInstance }; // Type assertion for payload
+        // Check if node already exists to prevent duplicates (optional, good practice)
+        if (this.graph.nodes.find(n => n.id === nodeInstance.id)) {
+          console.warn(`[MFNProcessor] Node with ID ${nodeInstance.id} already exists. Ignoring ADD_NODE.`);
+          // Optionally, send a message back to main thread indicating this
+          // this.port.postMessage({ type: WorkletMsgTypeEnum.WORKLET_ERROR, payload: { message: `Node ${nodeInstance.id} already exists.` } });
+          break;
+        }
+
+        this.graph.nodes.push(nodeInstance);
+        // Initialize state for the new node
+        this.nodeStates.set(nodeInstance.id, { ...nodeInstance.parameters });
+
+        // Adjust routingMatrix:
+        // The routingMatrix is channel -> sourceNodeIndex -> destNodeIndex.
+        // Adding a new node means new sourceNodeIndex and destNodeIndex possibilities.
+        // The new node will be at index this.graph.nodes.length - 1.
+        // const newNodeIndex = this.graph.nodes.length - 1;
+
+        // For each channel:
+        this.graph.routingMatrix.forEach((channelMatrix) => {
+          // Add a new row (for the new node as a source) to each existing destination's column.
+          // All existing nodes get a new potential source.
+          channelMatrix.forEach((sourceRow) => {
+            sourceRow.push(0); // New node as destination, default gain 0 from existing sources
+          });
+
+          // Add a new column (for the new node as a destination) for each existing source.
+          // The new node gets a new set of potential sources.
+          const newSourceRow = new Array(this.graph.nodes.length).fill(0);
+          channelMatrix.push(newSourceRow as number[]); // New node as source, default gain 0 to all destinations (including itself)
+        });
+
+        // If the routing matrix was empty (e.g., first node), initialize it.
+        if (this.graph.nodes.length === 1 && this.graph.routingMatrix.length === 0) {
+          const numChannels = this.maxChannels; // Or this.graph.outputChannels if that's more appropriate
+          for (let c = 0; c < numChannels; c++) {
+            this.graph.routingMatrix[c] = [[0]]; // Single node, single channel, connection to itself is 0
+          }
+        }
+
+
+        console.log(`[MFNProcessor] Added node: ${nodeInstance.id} (${nodeInstance.type}). Graph now has ${this.graph.nodes.length} nodes.`);
+        // Optionally, confirm back to the main thread
+        this.port.postMessage({
+          type: WorkletMsgTypeEnum.NODE_ADDED, // Ensure this enum member exists
+          payload: nodeInstance,
+        });
+        break;
+      }
       default:
         console.warn('[MFNProcessor] Unknown message type:', type);
     }

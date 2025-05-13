@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { MantineProvider, AppShell, LoadingOverlay } from '@mantine/core';
+import { MantineProvider, LoadingOverlay } from '@mantine/core';
 import { theme } from './theme';
 
-import Header from './components/Header/Header';
+import LayoutShell from './components/LayoutShell/LayoutShell';
 import Controls from './components/Controls/Controls';
 import Pedalboard from './components/Pedalboard/Pedalboard';
 import NodeList from './components/NodeList/NodeList';
@@ -11,7 +11,7 @@ import StatusDisplay from './components/StatusDisplay/StatusDisplay';
 
 import { useAudioInitialization } from './hooks/useAudioInitialization';
 import { useProcessorInitialization } from './hooks/useProcessorInitialization';
-import { useProcessorStatusCheck } from './hooks/useProcessorStatusCheck'; // + Import useProcessorStatusCheck
+import { useProcessorStatusCheck } from './hooks/useProcessorStatusCheck';
 
 import { useGraphStore } from './stores/graph';
 import { useUIStore } from './stores/ui';
@@ -22,7 +22,7 @@ import {
   type NodeType,
   MainThreadMessageType,
   type AudioGraph,
-  type WorkletMessage, // Added import for WorkletMessage
+  type WorkletMessage,
   WorkletMessageType,
 } from './audio/schema';
 
@@ -217,43 +217,34 @@ function App() {
 
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
-      <AppShell
-        header={{ height: 60 }}
-        padding="md"
-      >
-        <AppShell.Header>
-          <Header />
-        </AppShell.Header>
-
-        <AppShell.Main>
-          <LoadingOverlay visible={showLoadingOverlay} overlayProps={{ radius: "sm", blur: 2 }} />
-          <StatusDisplay
-            audioError={audioInitError}
-            audioInitialized={audioInitialized}
-            audioContextState={currentAudioContextState}
-            processorReady={processorHandshakeComplete}
-            initMessageSent={initMessageSent}
+      <LayoutShell>
+        <LoadingOverlay visible={showLoadingOverlay} overlayProps={{ radius: "sm", blur: 2 }} />
+        <StatusDisplay
+          audioError={audioInitError}
+          audioInitialized={audioInitialized}
+          audioContextState={currentAudioContextState}
+          processorReady={processorHandshakeComplete}
+          initMessageSent={initMessageSent}
+        />
+        <Controls
+          onAddNode={handleAddNode}
+          onAudioResume={() => { void handleResumeAudio(); }} // Wrap async call
+          audioContextState={currentAudioContextState}
+        />
+        <Pedalboard>
+          <NodeList
+            nodes={nodes}
+            onSelectNode={handleNodeSelect}
+            selectedNodeId={selectedNodeId}
           />
-          <Controls
-            onAddNode={handleAddNode}
-            onAudioResume={() => { void handleResumeAudio(); }} // Wrap async call
-            audioContextState={currentAudioContextState}
-          />
-          <Pedalboard>
-            <NodeList
-              nodes={nodes}
-              onSelectNode={handleNodeSelect}
-              selectedNodeId={selectedNodeId}
+          {selectedNodeInstance && (
+            <NodeEditor
+              selectedNode={selectedNodeInstance}
+              onParameterChange={handleParameterChange}
             />
-            {selectedNodeInstance && (
-              <NodeEditor
-                selectedNode={selectedNodeInstance}
-                onParameterChange={handleParameterChange}
-              />
-            )}
-          </Pedalboard>
-        </AppShell.Main>
-      </AppShell>
+          )}
+        </Pedalboard>
+      </LayoutShell>
     </MantineProvider>
   );
 }

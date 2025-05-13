@@ -65,7 +65,6 @@ export async function loadMFNWorklet(): Promise<MFNWorkletNode> { // Changed: pa
       numberOfInputs: 1, // Example: 1 stereo input
       numberOfOutputs: 1, // Example: 1 stereo output
       outputChannelCount: [2], // Specify channel count for each output, e.g. stereo for the first output
-      // processorOptions: { /* initial options if any */ }
     }) as MFNWorkletNode;
     console.log('[AudioIndex] MFNWorkletNode created successfully.');
 
