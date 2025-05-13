@@ -214,11 +214,25 @@ class MFNProcessor extends AudioWorkletProcessor {
     // destinationNodeInputs will be populated with inputs for the *current* block
     processMatrix(
       this.nodeOutputs,
-      this.graph,
+      this.graph, // graph is non-null here
       this.numChannels,
       blockSize,
       destinationNodeInputs, // This map will be populated by processMatrix
     );
+
+    // TODO: Address topological sorting or iterative processing strategy (from README/previous discussions).
+    // CURRENT APPROACH for feedback and processing order:
+    // 1. Feedback Handling: `processMatrix` uses `this.nodeOutputs` (outputs from the *previous* block)
+    //    to calculate `destinationNodeInputs` for the *current* block. This introduces an inherent
+    //    one-block delay in all feedback paths, effectively breaking cycles for same-block calculations.
+    //    This is a standard technique in block-based audio processing.
+    // 2. Node Processing Order: The loop below iterates nodes in the order they appear in `this.graph.nodes`,
+    //    which is defined by the main thread. Since all `destinationNodeInputs` are pre-calculated based on
+    //    the previous block, this iteration order does not change the audio outcome for the current block.
+    //    The order primarily matters for how `routingMatrix` indices correspond to nodes.
+    // 3. Iterative Processing: An iterative strategy (re-calculating graph outputs multiple times within
+    //    one block until convergence) is not currently implemented. It would be a more complex change,
+    //    potentially for future requirements like zero-delay feedback in specific scenarios.
 
     // 4. Iterate `this.graph.nodes` to process DSP and apply inputs
     for (const node of this.graph.nodes) {
