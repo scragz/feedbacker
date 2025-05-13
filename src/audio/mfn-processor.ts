@@ -54,7 +54,10 @@ import type {
   MainThreadMessage as ProcessorMessage,
 } from './schema';
 import { MainThreadMessageType } from './schema';
-import { processMatrix } from './matrix'; // Added import
+import { processMatrix } from './matrix';
+import { processGain } from './nodes/gain';
+import { processPassthrough } from './nodes/passthrough';
+import type { DSPKernel } from './nodes/dsp-kernel';
 
 // No MFNProcessorInterface needed
 
@@ -242,24 +245,31 @@ class MFNProcessor extends AudioWorkletProcessor {
         }
       }
 
-      // Apply DSP based on node type
-      if (node.type === 'gain') {
-        const paramGain = node.parameters.gain;
-        const gainValue = typeof paramGain === 'number' ? paramGain : 1.0;
-        for (let chan = 0; chan < this.numChannels; chan++) {
-          if (calculatedNodeInputBuffers[chan] && nodeKernelOutputBuffers[chan]) {
-            for (let sample = 0; sample < blockSize; sample++) {
-              nodeKernelOutputBuffers[chan][sample] = calculatedNodeInputBuffers[chan][sample] * gainValue;
-            }
-          }
-        }
-      } else { // For other node types (e.g., delay, biquad, or passthrough for now)
-        for (let chan = 0; chan < this.numChannels; chan++) {
-          if (calculatedNodeInputBuffers[chan] && nodeKernelOutputBuffers[chan]) {
-            nodeKernelOutputBuffers[chan].set(calculatedNodeInputBuffers[chan]);
-          }
-        }
+      // Select and apply DSP kernel based on node type
+      let kernel: DSPKernel;
+      switch (node.type) {
+        case 'gain':
+          kernel = processGain;
+          break;
+        // Add cases for other node types (delay, biquad, etc.) here
+        // case \'delay\':
+        //   kernel = processDelay; // Example
+        //   break;
+        case 'input_mixer': // Input mixers have already had their main input mixed in.
+        case 'output_mixer': // Output mixers just sum; their "kernel" is effectively passthrough here.
+        default: // For unknown types or types that only pass through (like mixer nodes at this stage)
+          kernel = processPassthrough;
+          break;
       }
+
+      kernel(
+        calculatedNodeInputBuffers, // expects Float32Array[] (port 0, [channelIndex][sampleIndex])
+        nodeKernelOutputBuffers,    // expects Float32Array[] (port 0, [channelIndex][sampleIndex])
+        node,
+        blockSize,
+        this.internalSampleRate,
+        this.numChannels,
+      );
     }
 
     // 5. Mix node outputs to `mainOutput`
