@@ -8,7 +8,19 @@
 h1 {
   will-change: filter;
   transition: filter 300ms;
+
+
+  --metal: silver;
+  --convexity: 1;
+  color: rgb(128, 128, 128);
+  box-shadow: #00000030 1px 2px 2px, #00000020 2px 4px 4px;
+  color: black;
+  text-shadow: white 0 0.5px 0;
+  overflow: hidden;
+  text-rendering: geometricPrecision;
+  transform: translateZ(0);
 }
+
 h1:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
