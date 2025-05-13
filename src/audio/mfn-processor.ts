@@ -51,78 +51,84 @@ declare global {
 
 import type {
   AudioGraph,
-  MainThreadMessage as ProcessorMessage,
+  AudioNodeInstance,
+  MainThreadMessage,
+  WorkletMessage,
+  WorkletMessageType,
 } from './schema';
-import { MainThreadMessageType, WorkletMessageType } from './schema'; // Added WorkletMessageType
-import { processMatrix } from './matrix';
-// Import all kernels from the barrel file
-import { processGain, processDelay, processBiquad, processPassthrough } from './nodes';
-import type { DSPKernel } from './nodes'; // Import DSPKernel type from new location
+import { MainThreadMessageType, NODE_PARAMETER_DEFINITIONS, WorkletMessageType as WorkletMsgTypeEnum } from './schema';
+import {dspKernels, type DSPKernel} from './nodes';
+import { বাজেtrix, createEmptyRoutingMatrix, getSourceNodes, getTargetNodes } from './matrix'; // Assuming বাজেtrix is a typo and should be matrix
+import type { NodeState } from './nodes/dsp-kernel'; // Import NodeState
+
+// AudioWorkletGlobalScope is available in AudioWorkletProcessor
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+declare const globalThis: AudioWorkletGlobalScope;
+const { sampleRate, currentTime, currentFrame } = globalThis;
 
 // No MFNProcessorInterface needed
 
 class MFNProcessor extends AudioWorkletProcessor {
-  private graph: AudioGraph | null = null;
-  private numChannels = 2;
-  private internalSampleRate: number;
-  private maxChannelsConfig = 32;
+  private graph: AudioGraph = { nodes: [], routingMatrix: [], outputChannels: 2, masterGain: 1.0 };
+  private maxChannels = 2;
+  private internalInputBuffer: Float32Array[] = [];
+  private internalOutputBuffer: Float32Array[] = [];
+  private nodeOutputBuffers: Map<string, Float32Array[]> = new Map();
+  private nodeStates: Map<string, NodeState> = new Map(); // Added to store state for each node
 
-  private readonly nodeOutputs: Map<string, Float32Array[][]> = new Map<string, Float32Array[][]>();
+  private initialized = false;
+  private lastGraphUpdateTime = 0;
 
   constructor(options?: AudioWorkletNodeOptions) {
     super(options);
-    this.internalSampleRate = sampleRate; // global sampleRate from AudioWorkletGlobalScope
-    this.port.onmessage = (event: MessageEvent<ProcessorMessage>) => {
-      this.onMessage(event.data);
-    };
-    this.initializeGraph(
-      { nodes: [], routingMatrix: [], outputChannels: 2, masterGain: 1.0 },
-      sampleRate, // global sampleRate
-      this.maxChannelsConfig,
-    );
-    console.log('[MFNProcessor] Initialized');
-    // Send PROCESSOR_READY message back to the main thread
-    this.port.postMessage({ type: WorkletMessageType.PROCESSOR_READY });
+    console.log('[MFNProcessor] Instance created.');
+    if (options?.processorOptions) {
+      // this.maxChannels = options.processorOptions.maxChannels || 8;
+      // this.graph = options.processorOptions.graph; // Initial graph can be passed here
+      console.log('[MFNProcessor] Received options:', options.processorOptions);
+    }
+
+    // Initialize graph with empty values
+    this.port.onmessage = this.handleMessage.bind(this);
+    // Signal readiness to the main thread
+    this.port.postMessage({ type: WorkletMsgTypeEnum.PROCESSOR_READY });
+    console.log('[MFNProcessor] Processor ready message sent.');
   }
 
-  private initializeGraph(
-    graph: AudioGraph,
-    sampleRateValue: number,
-    maxChannels: number,
-  ) {
-    this.graph = graph;
-    this.internalSampleRate = sampleRateValue;
-    this.maxChannelsConfig = maxChannels;
-    this.numChannels = graph.outputChannels || 2;
+  private handleMessage(event: MessageEvent<MainThreadMessage>): void {
+    const { type, payload } = event.data;
+    console.log(`[MFNProcessor] Received message: ${type}`, payload);
 
-    this.nodeOutputs.clear();
-    const initialBlockSize = 128;
-    this.graph.nodes.forEach(node => {
-      const nodeOutputBuffers: Float32Array[][] = [[]]; // Output port 0
-      for (let i = 0; i < this.numChannels; i++) {
-        nodeOutputBuffers[0][i] = new Float32Array(initialBlockSize);
-      }
-      this.nodeOutputs.set(node.id, nodeOutputBuffers);
-    });
-
-    console.log(
-      `[MFNProcessor] Graph initialized. Sample Rate: ${this.internalSampleRate}, Output Channels: ${this.numChannels}`,
-      this.graph,
-    );
-  }
-
-  private onMessage(message: ProcessorMessage): void {
-    switch (message.type) {
-      case MainThreadMessageType.INIT_PROCESSOR: {
-        const payload = message.payload; // No assertion needed if types align
-        this.initializeGraph(payload.graph, payload.sampleRate, payload.maxChannels);
+    switch (type) {
+      case MainThreadMessageType.INIT_PROCESSOR:
+        this.graph = payload.graph;
+        this.maxChannels = payload.maxChannels;
+        // Initialize node states
+        this.nodeStates.clear();
+        this.graph.nodes.forEach(node => {
+          this.nodeStates.set(node.id, {}); // Initialize with empty state
+        });
+        this.initialized = true;
+        this.lastGraphUpdateTime = currentTime;
+        console.log('[MFNProcessor] Initialized with graph:', this.graph, 'maxChannels:', this.maxChannels);
         break;
-      }
-      case MainThreadMessageType.UPDATE_GRAPH: {
-        const payload = message.payload;
-        this.initializeGraph(payload.graph, this.internalSampleRate, this.maxChannelsConfig);
+      case MainThreadMessageType.UPDATE_GRAPH:
+        this.graph = payload.graph;
+        // Update node states: add new, remove old if necessary
+        const newNodeIds = new Set(this.graph.nodes.map(n => n.id));
+        for (const nodeId of this.nodeStates.keys()) {
+          if (!newNodeIds.has(nodeId)) {
+            this.nodeStates.delete(nodeId);
+          }
+        }
+        this.graph.nodes.forEach(node => {
+          if (!this.nodeStates.has(node.id)) {
+            this.nodeStates.set(node.id, {}); // Initialize new nodes with empty state
+          }
+        });
+        this.lastGraphUpdateTime = currentTime;
+        console.log('[MFNProcessor] Graph updated:', this.graph);
         break;
-      }
       case MainThreadMessageType.UPDATE_PARAMETER: {
         if (this.graph) {
           const payload = message.payload;
@@ -167,6 +173,32 @@ class MFNProcessor extends AudioWorkletProcessor {
         break;
       }
     }
+  }
+
+  private initializeGraph(
+    graph: AudioGraph,
+    sampleRateValue: number,
+    maxChannels: number,
+  ) {
+    this.graph = graph;
+    this.internalSampleRate = sampleRateValue;
+    this.maxChannelsConfig = maxChannels;
+    this.numChannels = graph.outputChannels || 2;
+
+    this.nodeOutputs.clear();
+    const initialBlockSize = 128;
+    this.graph.nodes.forEach(node => {
+      const nodeOutputBuffers: Float32Array[][] = [[]]; // Output port 0
+      for (let i = 0; i < this.numChannels; i++) {
+        nodeOutputBuffers[0][i] = new Float32Array(initialBlockSize);
+      }
+      this.nodeOutputs.set(node.id, nodeOutputBuffers);
+    });
+
+    console.log(
+      `[MFNProcessor] Graph initialized. Sample Rate: ${this.internalSampleRate}, Output Channels: ${this.numChannels}`,
+      this.graph,
+    );
   }
 
   process(
@@ -364,6 +396,132 @@ class MFNProcessor extends AudioWorkletProcessor {
       }
     }
 
+    return true;
+  }
+
+  // ...existing code...
+  private processGraph(inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array>): boolean {
+    if (!this.initialized || !this.graph || this.graph.nodes.length === 0) {
+      // console.warn('[MFNProcessor] Not initialized or empty graph, passing through audio.');
+      // Passthrough audio if not initialized
+      const mainInput = inputs[0];
+      const mainOutput = outputs[0];
+      if (mainInput && mainOutput) {
+        for (let channel = 0; channel < Math.min(mainInput.length, mainOutput.length); ++channel) {
+          if (mainInput[channel] && mainOutput[channel]) {
+            mainOutput[channel].set(mainInput[channel]);
+          }
+        }
+      }
+      return true;
+    }
+
+    const blockSize = inputs[0]?.[0]?.length ?? 128; // Get blockSize from actual input
+
+    // 1. Initialize or clear node output buffers for this block
+    this.graph.nodes.forEach(node => {
+      let buffers = this.nodeOutputBuffers.get(node.id);
+      if (!buffers || buffers.length !== this.graph.outputChannels || buffers[0]?.length !== blockSize) {
+        buffers = Array.from({ length: this.graph.outputChannels }, () => new Float32Array(blockSize));
+      } else {
+        buffers.forEach(buffer => buffer.fill(0));
+      }
+      this.nodeOutputBuffers.set(node.id, buffers);
+    });
+
+    // 2. Process 'input_mixer' nodes first (system inputs)
+    // These effectively take data from `inputs` and place it into their `nodeOutputBuffers`
+    this.graph.nodes.filter(node => node.type === 'input_mixer').forEach(inputNode => {
+      const inputNodeOutput = this.nodeOutputBuffers.get(inputNode.id);
+      const mainProcessorInput = inputs[0]; // Assuming first input array is the main one
+      if (inputNodeOutput && mainProcessorInput) {
+        for (let i = 0; i < Math.min(inputNodeOutput.length, mainProcessorInput.length); i++) {
+          if (mainProcessorInput[i]) { // Check if the specific channel input exists
+            inputNodeOutput[i].set(mainProcessorInput[i]);
+          }
+        }
+      }
+    });
+
+
+    // 3. Iteratively process other nodes or use a topological sort if complex dependencies arise.
+    // For now, a simple iteration might work if feedback is handled with one block delay.
+    // TODO: Implement topological sort or a more robust processing order if needed.
+    this.graph.nodes
+      .filter(node => node.type !== 'input_mixer' && node.type !== 'output_mixer') // Process actual DSP nodes
+      .forEach(node => {
+        const kernel = dspKernels[node.type];
+        const nodeInputBuffers: Float32Array[] = Array.from({ length: this.graph.outputChannels }, () => new Float32Array(blockSize));
+        const nodeOutput = this.nodeOutputBuffers.get(node.id);
+        const nodeState = this.nodeStates.get(node.id) || {}; // Get or initialize node state
+
+        // Sum inputs for this node based on the routing matrix
+        for (let c = 0; c < this.graph.outputChannels; c++) {
+          const sourceNodesData = getSourceNodes(this.graph, node.id, c);
+          sourceNodesData.forEach(sourceData => {
+            const sourceOutputBuffer = this.nodeOutputBuffers.get(sourceData.sourceNodeId);
+            if (sourceOutputBuffer && sourceOutputBuffer[c]) {
+              for (let i = 0; i < blockSize; i++) {
+                nodeInputBuffers[c][i] += sourceOutputBuffer[c][i] * sourceData.gain;
+              }
+            }
+          });
+        }
+
+        if (kernel && nodeOutput) {
+          try {
+            kernel(nodeInputBuffers, nodeOutput, node, blockSize, sampleRate, this.graph.outputChannels, nodeState);
+            this.nodeStates.set(node.id, nodeState); // Persist any state changes from the kernel
+          } catch (e) {
+            console.error(`[MFNProcessor] Error processing node ${node.id} (${node.type}):`, e);
+            // Optional: Post error to main thread
+            this.port.postMessage({
+              type: WorkletMsgTypeEnum.NODE_ERROR,
+              payload: { nodeId: node.id, error: (e as Error).message }
+            });
+            // Silence output of this node in case of error
+            nodeOutput.forEach(ch => ch.fill(0));
+          }
+        } else if (!kernel) {
+          // console.warn(`[MFNProcessor] No kernel for node type: ${node.type}. Passing through for this node.`);
+          // If no kernel, pass through inputs to this node's output buffer (or silence if no input)
+          if (nodeOutput) {
+            for(let c=0; c < this.graph.outputChannels; c++) {
+              if(nodeInputBuffers[c]) {
+                nodeOutput[c].set(nodeInputBuffers[c]);
+              } else {
+                nodeOutput[c].fill(0);
+              }
+            }
+          }
+        }
+      });
+
+    // 4. Process 'output_mixer' nodes (system outputs)
+    // These sum the outputs of nodes routed to them into `outputs`
+    const mainProcessorOutput = outputs[0]; // Assuming first output array is the main one
+    if (mainProcessorOutput) {
+      mainProcessorOutput.forEach(channelBuffer => channelBuffer.fill(0)); // Clear main output buffer
+
+      this.graph.nodes.filter(node => node.type === 'output_mixer').forEach(outputNode => {
+        // For each channel of the output mixer
+        for (let c = 0; c < this.graph.outputChannels; c++) {
+          if (mainProcessorOutput[c]) {
+            const sourceNodesData = getSourceNodes(this.graph, outputNode.id, c);
+            sourceNodesData.forEach(sourceData => {
+              const sourceOutputBuffer = this.nodeOutputBuffers.get(sourceData.sourceNodeId);
+              if (sourceOutputBuffer && sourceOutputBuffer[c]) {
+                for (let i = 0; i < blockSize; i++) {
+                  mainProcessorOutput[c][i] += sourceOutputBuffer[c][i] * sourceData.gain;
+                  // Apply masterGain at the very end
+                  mainProcessorOutput[c][i] *= this.graph.masterGain;
+                }
+              }
+            });
+          }
+        }
+      });
+    }
     return true;
   }
 }

@@ -36,6 +36,8 @@ export enum WorkletMessageType {
   DATA_AVAILABLE = 'DATA_AVAILABLE',
   /** Reports an error from the worklet. */
   WORKLET_ERROR = 'WORKLET_ERROR',
+  /** Reports an error specific to an audio node's processing. */
+  NODE_ERROR = 'NODE_ERROR', // Added for specific node errors
   /** Reports current RMS or peak levels for visualization. */
   METER_UPDATE = 'METER_UPDATE', // Example for VU meters
 }
@@ -193,6 +195,14 @@ export interface WorkletErrorMessage {
   };
 }
 
+export interface NodeErrorMessage { // Added interface for NODE_ERROR message
+  type: WorkletMessageType.NODE_ERROR;
+  payload: {
+    nodeId: string;
+    error: string;
+  };
+}
+
 export interface MeterUpdateMessage {
   type: WorkletMessageType.METER_UPDATE;
   payload: {
@@ -204,6 +214,7 @@ export type WorkletMessage =
   | ProcessorReadyMessage
   | DataAvailableMessage
   | WorkletErrorMessage
+  | NodeErrorMessage // Added to union type
   | MeterUpdateMessage;
 
 // === Example Parameter Definitions for Specific Node Types ===

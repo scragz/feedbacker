@@ -11,6 +11,7 @@ import type { AudioNodeInstance } from '../schema';
  * @param blockSize - The number of samples in the current processing block.
  * @param sampleRate - The current sample rate.
  * @param numChannels - The number of channels being processed.
+ * @param nodeState - An object to manage state for individual audio nodes within the processor.
  */
 export type DSPKernel = (
   inputs: Float32Array[], // input port 0: [channelIndex][sampleIndex]
@@ -19,4 +20,13 @@ export type DSPKernel = (
   blockSize: number,
   sampleRate: number,
   numChannels: number,
+  nodeState: Record<string, any>, // Added to manage state for nodes like delay, biquad
 ) => void;
+
+/**
+ * Define a more specific type for node state if possible, or use a generic for now.
+ * For example, if state always involves buffers or specific numeric values:
+ * export type NodeState = Record<string, Float32Array | number | boolean | object>;
+ * Using a simpler approach for now, can be refined later.
+ */
+export type NodeState = Record<string, unknown>;
