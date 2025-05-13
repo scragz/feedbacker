@@ -70,6 +70,9 @@ export interface ParameterDefinition<T = number> {
   unit?: string; // e.g., 'Hz', 'dB', 's'
 }
 
+// Helper type for parameter values
+export type ParameterValue = string | number | boolean;
+
 /**
  * Describes an instance of an audio node in the graph.
  */
@@ -77,7 +80,7 @@ export interface AudioNodeInstance {
   id: string; // Unique ID for this node instance in the graph
   type: NodeType; // Type of DSP kernel to use
   label?: string; // Optional user-defined label for the node
-  parameters: Record<string, ParameterDefinition['currentValue']>; // Current parameter values { paramId: value }
+  parameters: Record<string, ParameterValue | undefined>; // Current parameter values { paramId: value }
   // Position for UI, not used by worklet directly but useful for graph state
   uiPosition?: { x: number; y: number };
 }
@@ -139,7 +142,7 @@ export interface UpdateParameterMessage {
   payload: {
     nodeId: string;
     parameterId: string;
-    value: ParameterDefinition['currentValue'];
+    value: ParameterValue | undefined; // Ensure this matches
   };
 }
 

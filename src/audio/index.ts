@@ -5,7 +5,7 @@
  * Includes helpers for initializing the AudioContext and loading the AudioWorklet.
  */
 
-import { WorkletMessageType, type AudioGraph, MainThreadMessageType } from './schema'; // Added MainThreadMessageType and AudioGraph
+import { WorkletMessageType } from './schema'; // Removed AudioGraph, MainThreadMessageType
 import MFNProcessorURL from './mfn-processor.ts?worker&url'; // Vite-specific import for worker URL
 
 const MFN_PROCESSOR_NAME = 'mfn-processor';
@@ -97,7 +97,7 @@ export async function loadMFNWorklet(): Promise<MFNWorkletNode> { // Changed: pa
  * Gets the existing MFNWorkletNode instance.
  * @returns The MFNWorkletNode or null if not loaded.
  */
-export function getMFNNode(): MFNWorkletNode | null {
+export function getMFNWorkletNode(): MFNWorkletNode | null { // Renamed from getMFNNode
   return mfnNode;
 }
 
@@ -121,7 +121,7 @@ export async function initializeAudioSystem() { // Renamed and made exportable
     workletNode.connect(getAudioContext().destination);
     console.log('[AudioSystem] Initialized, MFN worklet loaded and connected to destination.');
 
-    // Example: Send an init message after it's ready
+    // Removed automatic INIT_PROCESSOR message. App.tsx will handle this.
     // Wait for the PROCESSOR_READY message or use a small delay as a fallback.
     const listenForReady = new Promise<void>(resolve => {
       if (!mfnNode) { // Should not happen if loadMFNWorklet succeeded
@@ -138,23 +138,14 @@ export async function initializeAudioSystem() { // Renamed and made exportable
       // Timeout if ready message isn't received
       setTimeout(() => {
         mfnNode?.port.removeEventListener('message', readyListener);
-        resolve(); // Resolve anyway to attempt sending init
-        console.warn("[AudioSystem] Timeout waiting for PROCESSOR_READY, attempting to send INIT anyway.");
+        resolve(); // Resolve anyway to allow App to attempt sending init
+        console.warn("[AudioSystem] Timeout waiting for PROCESSOR_READY, App.tsx will attempt to send INIT.");
       }, 1000); // 1 second timeout
     });
 
     await listenForReady;
-
-    if (mfnNode && getAudioContext().state === 'running') {
-      const initialGraph: AudioGraph = { nodes: [], routingMatrix: [[[]]], outputChannels: 2, masterGain: 0.7 };
-      console.log('[AudioSystem] Sending INIT_PROCESSOR message to worklet.');
-      mfnNode.port.postMessage({
-        type: MainThreadMessageType.INIT_PROCESSOR,
-        payload: { graph: initialGraph, sampleRate: getAudioContext().sampleRate, maxChannels: 2 }
-      });
-    } else if (getAudioContext().state !== 'running') {
-      console.warn('[AudioSystem] AudioContext not running. INIT_PROCESSOR message not sent. User interaction might be needed.');
-    }
+    // App.tsx will now be responsible for checking mfnNode and AudioContext state
+    // before sending INIT_PROCESSOR.
 
   } catch (error) {
     console.error('[AudioSystem] Failed to initialize audio system:', error);
