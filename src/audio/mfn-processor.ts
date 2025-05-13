@@ -60,6 +60,7 @@ import {
   processDelay,
   processBiquad,
   processPassthrough,
+  noiseKernel, // ADDED: Import noiseKernel
   type DSPKernel,
 } from './nodes';
 import type { NodeState } from './nodes/dsp-kernel';
@@ -71,8 +72,9 @@ const dspKernels: Partial<Record<NodeType, DSPKernel>> = {
   gain: processGain,
   delay: processDelay,
   biquad: processBiquad,
-  input_mixer: processPassthrough,
+  input_mixer: processPassthrough, // Assuming passthrough for mixers
   output_mixer: processPassthrough,
+  noise: noiseKernel, // ADDED: Register noise kernel
 };
 
 function getSourceNodeDataForDestination(
@@ -311,6 +313,7 @@ class MFNProcessor extends AudioWorkletProcessor {
     this.graph.nodes
       .filter((node) => node.type !== 'input_mixer' && node.type !== 'output_mixer')
       .forEach((node) => {
+        console.log(`[MFNProcessor] Processing node in main loop: ${node.id}, type: ${node.type}`); // ADDED LOG
         const kernel = dspKernels[node.type];
         const nodeInputBuffers: Float32Array[] = Array.from({ length: numSystemChannels }, () => new Float32Array(blockSize));
         const nodeOutputBuffers = this.nodeOutputBuffers.get(node.id);

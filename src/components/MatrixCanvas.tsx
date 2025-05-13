@@ -14,11 +14,11 @@ const MatrixCanvas: React.FC<MatrixCanvasProps> = ({
   numChannels: propNumChannels = 2,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { nodes, routingMatrix, setMatrixValue } = useGraphStore(state => ({
-    nodes: state.nodes,
-    routingMatrix: state.routingMatrix,
-    setMatrixValue: state.setMatrixValue,
-  }));
+
+  // Split useGraphStore calls to ensure stable references for selectors
+  const nodes = useGraphStore(state => state.nodes);
+  const routingMatrix = useGraphStore(state => state.routingMatrix);
+  const setMatrixValue = useGraphStore(state => state.setMatrixValue);
 
   const numEffectiveChannels = routingMatrix.length > 0 ? routingMatrix.length : propNumChannels;
   const numNodes = nodes.length;

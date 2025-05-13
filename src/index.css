@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Frijole&family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Frijole&family=Space+Grotesk:wght@300..700&family=VT323&display=swap');
 
 :root {
   color-scheme: dark;
@@ -37,21 +37,20 @@ body {
   min-height: 100vh;
 }
 
-button {
+button, .mantine-Button-root {
   border-radius: 8px;
   border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: var(--mantine-font-family);
-  background-color: #1a1a1a;
+  font-size: 1.5em;
+  font-weight: 700;
+  font-family: var(--mantine-font-family-monospace);
+  text-transform: uppercase;
   cursor: pointer;
   transition: border-color 0.25s;
 }
-button:hover {
+button:hover, .mantine-Button-root:hover {
   border-color: #646cff;
 }
-button:focus,
-button:focus-visible {
+button:focus, .mantine-Button-root:focus,
+button:focus-visible, .mantine-Button-root:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }

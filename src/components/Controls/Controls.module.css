@@ -8,16 +8,6 @@
   gap: 10px;
 }
 
-.controlsTitle {
-  color: #e0e0e0;
-  margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 1.2em;
-  text-align: center;
-  border-bottom: 1px solid #555;
-  padding-bottom: 5px;
-}
-
 .buttonGroup {
   display: flex;
   gap: 10px;

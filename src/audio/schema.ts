@@ -65,7 +65,7 @@ export type NodeType =
   | 'delay'
   | 'biquad'
   | 'oscillator' // Example
-  | 'noise' // Example
+  | 'noise' // MODIFIED: Ensured noise is part of the type
   | 'input_mixer' // Special node for graph input
   | 'output_mixer'; // Special node for graph output
 
@@ -296,7 +296,7 @@ export const NODE_PARAMETER_DEFINITIONS: NodeParameterDefinitions = {
     type: { id: 'type', label: 'Waveform', type: 'enum', defaultValue: 'sine', enumValues: ['sine', 'square', 'sawtooth', 'triangle'] },
     gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.7, minValue: 0, maxValue: 1, unit: '' },
   },
-  noise: {
+  noise: { // ADDED: noise type definition
     type: { id: 'type', label: 'Noise Type', type: 'enum', defaultValue: 'white', enumValues: ['white', 'pink', 'brownian'] },
     gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '' },
   },

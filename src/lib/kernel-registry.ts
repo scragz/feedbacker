@@ -30,6 +30,7 @@ export class KernelRegistry {
     this.register('delay', Kernels.processDelay);
     this.register('biquad', Kernels.processBiquad);
     this.register('passthrough', Kernels.processPassthrough);
+    this.register('noise', Kernels.noiseKernel);
     // Add other kernels here if they follow the same naming convention
   }
 

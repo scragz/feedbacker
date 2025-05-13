@@ -12,6 +12,23 @@ import {
 import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 
+// Define the initial output mixer node
+const initialOutputMixerNodeId = nanoid(10);
+const initialOutputMixerNode: AudioNodeInstance = {
+  id: initialOutputMixerNodeId,
+  type: 'output_mixer',
+  parameters: NODE_PARAMETER_DEFINITIONS.output_mixer
+    ? Object.fromEntries(
+        Object.entries(NODE_PARAMETER_DEFINITIONS.output_mixer).map(([paramId, def]) => [
+          paramId,
+          def.defaultValue,
+        ]),
+      )
+    : {}, // Fallback to empty if output_mixer is somehow not in definitions
+  label: 'Output Mixer',
+  uiPosition: { x: 50, y: 50 }, // Default position
+};
+
 export interface SerializedAudioGraph {
   nodes: AudioNodeInstance[];
   connections: { from: NodeId; to: NodeId; weight: number; channel: number }[];
@@ -42,6 +59,9 @@ export interface GraphState extends AudioGraph {
 const initialOutputChannels = 2;
 const initialMasterGain = 0.8;
 
+// Initial nodes array now includes the output mixer
+const initialNodes: AudioNodeInstance[] = [initialOutputMixerNode];
+
 const initializeRoutingMatrix = (nodeCount: number, channelCount: number): RoutingMatrix => {
   const matrix: RoutingMatrix = [];
   for (let i = 0; i < channelCount; i++) {
@@ -57,8 +77,8 @@ const initializeRoutingMatrix = (nodeCount: number, channelCount: number): Routi
 
 export const useGraphStore = create(
   immer<GraphState>((set, get) => ({
-    nodes: [],
-    routingMatrix: initializeRoutingMatrix(0, initialOutputChannels),
+    nodes: initialNodes, // Use the new initialNodes array
+    routingMatrix: initializeRoutingMatrix(initialNodes.length, initialOutputChannels), // Initialize matrix based on initialNodes
     outputChannels: initialOutputChannels,
     masterGain: initialMasterGain,
 

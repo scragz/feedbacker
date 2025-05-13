@@ -19,9 +19,11 @@ const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAud
   const addBiquadNode = () => {
     onAddNode('biquad');
   };
+  const addNoiseNode = () => {
+    onAddNode('noise');
+  };
   return (
     <div className={classes.controlsContainer}>
-      <h3 className={classes.controlsTitle}>Controls</h3>
       {audioContextState === 'suspended' && (
         <Button onClick={onAudioResume} fullWidth variant="filled" color="orange" mb="sm">
           Resume Audio Context
@@ -36,6 +38,9 @@ const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAud
         </Button>
         <Button onClick={addBiquadNode} variant="light">
           Add Biquad
+        </Button>
+        <Button onClick={addNoiseNode} variant="light">
+          Add Noise
         </Button>
       </Group>
     </div>

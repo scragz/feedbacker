@@ -29,7 +29,8 @@ const mfnOrange: MantineColorsTuple = [
 ];
 
 export const theme = createTheme({
-  fontFamily: "'IBM Plex Mono', monospace",
+  fontFamily: "'Space Grotesk', sans-serif",
+  fontFamilyMonospace: "'VT323', monospace",
   primaryColor: 'mfnCyan',
   colors: {
     mfnCyan,
