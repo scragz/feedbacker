@@ -1,29 +1,23 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { MantineProvider, Text, MantineThemeOverride } from '@mantine/core'; // Ensure Text is imported
+import { useState, useCallback, useRef } from 'react'; // Removed useEffect
+import { Text } from '@mantine/core'; // Ensure Text is imported, removed MantineProvider, MantineThemeOverride
 import Pedalboard from './components/Pedalboard/Pedalboard';
 import Header from './components/Header/Header';
 import Controls, { ControlsProps } from './components/Controls/Controls'; // Import ControlsProps
 import NodeList from './components/NodeList/NodeList';
 import NodeEditor from './components/NodeEditor/NodeEditor';
 import StatusDisplay, { StatusDisplayProps } from './components/StatusDisplay/StatusDisplay'; // Import StatusDisplayProps
-import { MFNWorkletNode, setupAudioWorklet } from './audio';
 import type {
   AudioGraph,
   AudioNodeInstance,
   NodeType,
-  MainThreadMessage,
-  WorkletMessage,
   ParameterValue,
-  InitProcessorMessage,
   UpdateParameterMessage,
   AddNodeMessage, // Correctly import AddNodeMessage
-  NodeAddedMessage,
-  NodeRemovedMessage,
-  ParameterUpdatedMessage,
-  GraphUpdatedMessage,
-  WorkletErrorMessage,
 } from './audio/schema';
-import { MainThreadMessageType, WorkletMessageType, NODE_PARAMETER_DEFINITIONS } from './audio/schema';
+import { MainThreadMessageType, NODE_PARAMETER_DEFINITIONS } from './audio/schema'; // Removed WorkletMessageType
+import { useAudioInitialization } from './hooks/useAudioInitialization';
+import { useProcessorStatusCheck } from './hooks/useProcessorStatusCheck';
+import { useProcessorInitialization } from './hooks/useProcessorInitialization';
 
 const initialGraph: AudioGraph = {
   nodes: [],
@@ -34,149 +28,38 @@ const initialGraph: AudioGraph = {
 
 const MAX_CHANNELS = 2; // Default to stereo, ensure this matches worklet and context
 
-// Define Mantine theme override for dark mode
-const theme: MantineThemeOverride = {
-  colorScheme: 'dark',
-};
-
 function App() {
-  const [audioInitialized, setAudioInitialized] = useState(false);
+  // const [audioInitialized, setAudioInitialized] = useState(false); // Moved to useAudioInitialization
   const [audioError, setAudioError] = useState<string | null>(null);
   const [audioContextState, setAudioContextState] = useState<AudioContextState | null>(null);
   const [processorReady, setProcessorReady] = useState(false);
-  const [initMessageSent, setInitMessageSent] = useState(false);
-  const [checkStatusSent, setCheckStatusSent] = useState(false);
+  // const [initMessageSent, setInitMessageSent] = useState(false); // Moved to useProcessorInitialization
+  // const [checkStatusSent, setCheckStatusSent] = useState(false); // Moved to useProcessorStatusCheck
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [audioGraph, setAudioGraph] = useState<AudioGraph>(initialGraph);
 
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null); // Use AudioWorkletNode type
+  // const audioContextRef = useRef<AudioContext | null>(null); // Moved to useAudioInitialization
+  // const workletNodeRef = useRef<AudioWorkletNode | null>(null); // Moved to useAudioInitialization
 
-  useEffect(() => {
-    let isMounted = true;
-    if (!audioContextRef.current) {
-      const initializeAudio = async () => {
-        try {
-          const context = new AudioContext();
-          if (isMounted) setAudioContextState(context.state);
-          context.onstatechange = () => {
-            if (isMounted) setAudioContextState(context.state);
-          };
+  const { audioContextRef, workletNodeRef, audioInitialized } = useAudioInitialization({
+    setAudioGraph,
+    setAudioError,
+    setProcessorReady,
+    setAudioContextState,
+  });
 
-          await setupAudioWorklet(context);
-          // Use the correct MFNWorkletNode constructor if it's a custom class extending AudioWorkletNode
-          // For now, assuming MFNWorkletNode is a type alias or setupAudioWorklet handles registration
-          const mfnNode = new AudioWorkletNode(context, 'mfn-processor', {
-            numberOfInputs: 1,
-            numberOfOutputs: 1,
-            outputChannelCount: [MAX_CHANNELS],
-            processorOptions: { maxChannels: MAX_CHANNELS, sampleRate: context.sampleRate },
-          });
+  useProcessorStatusCheck({ // Removed unused destructured variables
+    audioContextState,
+    workletNodeRef,
+    processorReady,
+  });
 
-          mfnNode.connect(context.destination);
-
-          mfnNode.port.onmessage = (event: MessageEvent<WorkletMessage>) => {
-            if (!isMounted) return;
-            const { type, payload } = event.data;
-            console.log('[App.tsx] Received message from worklet:', type, payload);
-
-            switch (type) {
-              case WorkletMessageType.PROCESSOR_READY:
-                if (isMounted) setProcessorReady(true);
-                console.log('[App.tsx] Audio processor is ready.');
-                break;
-              case WorkletMessageType.NODE_ADDED:
-                if (isMounted && payload) {
-                  const nodeAddedPayload = payload as NodeAddedMessage['payload'];
-                  setAudioGraph(prevGraph => ({
-                    ...prevGraph,
-                    nodes: [...prevGraph.nodes, nodeAddedPayload],
-                  }));
-                }
-                break;
-              case WorkletMessageType.NODE_REMOVED:
-                if (isMounted && payload) {
-                  const nodeRemovedPayload = payload as NodeRemovedMessage['payload'];
-                  setAudioGraph(prevGraph => ({
-                    ...prevGraph,
-                    nodes: prevGraph.nodes.filter(n => n.id !== nodeRemovedPayload.nodeId),
-                  }));
-                }
-                break;
-              case WorkletMessageType.PARAMETER_UPDATED:
-                if (isMounted && payload) {
-                  const paramUpdatedPayload = payload as ParameterUpdatedMessage['payload'];
-                  setAudioGraph(prevGraph => ({
-                    ...prevGraph,
-                    nodes: prevGraph.nodes.map(n =>
-                      n.id === paramUpdatedPayload.nodeId
-                        ? { ...n, parameters: { ...n.parameters, [paramUpdatedPayload.parameterId]: paramUpdatedPayload.value } }
-                        : n
-                    ),
-                  }));
-                }
-                break;
-              case WorkletMessageType.GRAPH_UPDATED:
-                if (isMounted && payload) {
-                  setAudioGraph(payload as GraphUpdatedMessage['payload']);
-                }
-                break;
-              case WorkletMessageType.WORKLET_ERROR:
-              case WorkletMessageType.NODE_ERROR:
-                if (isMounted && payload) {
-                  const errorPayload = payload as WorkletErrorMessage['payload'];
-                  setAudioError(errorPayload.message);
-                  console.error('[App.tsx] Worklet Error:', errorPayload.message);
-                }
-                break;
-              default:
-                console.warn('[App.tsx] Received unknown message type from worklet:', type);
-            }
-          };
-
-          audioContextRef.current = context;
-          workletNodeRef.current = mfnNode;
-          if (isMounted) setAudioInitialized(true);
-
-        } catch (error) {
-          console.error('Error initializing audio:', error);
-          if (isMounted) setAudioError(error instanceof Error ? error.message : String(error));
-        }
-      };
-      void initializeAudio();
-    }
-    return () => {
-      isMounted = false;
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        // audioContextRef.current.close(); // Consider implications before enabling
-      }
-    };
-
-  }, []);
-
-  useEffect(() => {
-    if (audioContextRef.current?.state === 'running' && workletNodeRef.current && !processorReady && !checkStatusSent) {
-      console.log('[App.tsx] Audio context running, sending CHECK_PROCESSOR_STATUS');
-      workletNodeRef.current.port.postMessage({ type: MainThreadMessageType.CHECK_PROCESSOR_STATUS });
-      setCheckStatusSent(true);
-    }
-  }, [audioContextState, processorReady, checkStatusSent]);
-
-  useEffect(() => {
-    if (processorReady && workletNodeRef.current && audioContextRef.current && !initMessageSent) {
-      console.log('[App.tsx] Processor ready, sending INIT_PROCESSOR with graph:', audioGraph);
-      const initMessage: InitProcessorMessage = {
-        type: MainThreadMessageType.INIT_PROCESSOR,
-        payload: {
-          graph: audioGraph,
-          sampleRate: audioContextRef.current.sampleRate,
-          maxChannels: MAX_CHANNELS,
-        },
-      };
-      workletNodeRef.current.port.postMessage(initMessage);
-      setInitMessageSent(true);
-    }
-  }, [processorReady, initMessageSent, audioGraph]);
+  useProcessorInitialization({ // Removed unused destructured variables
+    processorReady,
+    workletNodeRef,
+    audioContextRef,
+    audioGraph,
+  });
 
   const handleResumeAudio = useCallback(async () => {
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
@@ -188,7 +71,7 @@ function App() {
         setAudioError(error instanceof Error ? error.message : String(error));
       }
     }
-  }, []);
+  }, [audioContextRef]); // Added audioContextRef to dependencies
 
   const handleAddNode = (type: NodeType) => {
     if (!workletNodeRef.current || !audioContextRef.current) {
@@ -199,11 +82,10 @@ function App() {
     const nodeParamDefinitionsMap = NODE_PARAMETER_DEFINITIONS[type];
     const defaultParameters: Record<string, ParameterValue> = {};
 
-    if (nodeParamDefinitionsMap) {
-      for (const paramKey in nodeParamDefinitionsMap) {
-        const paramDef = nodeParamDefinitionsMap[paramKey];
-        defaultParameters[paramDef.id] = paramDef.defaultValue;
-      }
+    // Removed unnecessary conditional as NODE_PARAMETER_DEFINITIONS[type] will always exist or be empty object
+    for (const paramKey in nodeParamDefinitionsMap) {
+      const paramDef = nodeParamDefinitionsMap[paramKey];
+      defaultParameters[paramDef.id] = paramDef.defaultValue;
     }
 
     const newNodeInstance: AudioNodeInstance = {
@@ -253,7 +135,7 @@ function App() {
     } else {
       setAudioError("Worklet node not available to update parameter.");
     }
-  }, []);
+  }, [workletNodeRef]); // Added workletNodeRef to dependencies
 
   const selectedNode = audioGraph.nodes.find(node => node.id === selectedNodeId) ?? null;
 
@@ -268,12 +150,12 @@ function App() {
   const controlsProps: ControlsProps = {
     onAddNode: handleAddNode,
     audioContextState: audioContextState,
-    onAudioResume: handleResumeAudio,
+    onAudioResume: () => { void handleResumeAudio(); }, // Ensure void return for onAudioResume
     // Add any other props Controls might need, e.g., isProcessorReady: processorReady
   };
 
   return (
-    <MantineProvider theme={theme} withGlobalStyles withNormalizeCSS>
+    <>
       <Pedalboard>
         <Header />
         <StatusDisplay {...statusDisplayProps} />
@@ -301,7 +183,7 @@ function App() {
           </>
         )}
       </Pedalboard>
-    </MantineProvider>
+    </>
   );
 }
 

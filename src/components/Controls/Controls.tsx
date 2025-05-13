@@ -3,7 +3,7 @@ import { Button, Group } from '@mantine/core'; // Using Mantine Button
 import classes from './Controls.module.css';
 import type { NodeType } from '../../audio/schema';
 
-interface ControlsProps {
+export interface ControlsProps {
   onAddNode: (type: NodeType) => void;
   audioContextState: AudioContextState | null;
   onAudioResume: () => void;
