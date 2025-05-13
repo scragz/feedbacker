@@ -138,7 +138,7 @@ export class MFNGraphBuilder {
     }
     return this;
   }
-  
+
   public updateNodeParameters(nodeId: string, parameters: Record<string, number>): this {
     const node = this.nodesInternal.find(n => n.id === nodeId);
     if (node) {
@@ -254,11 +254,11 @@ const newMatrix = createEmpty3DRoutingMatrix(graphData.outputChannels, graphData
 
 if (graphData.outputChannels > 0 && graphData.nodes.length > 1) {
   // Channel 0: input1 (idx 0) -> delayL (idx 1)
-  newMatrix[0][0][1] = 1.0; 
+  newMatrix[0][0][1] = 1.0;
   // Channel 0: delayL (idx 1) -> gain1 (idx 2)
   newMatrix[0][1][2] = 0.8;
   // Channel 0: gain1 (idx 2) -> delayL (idx 1) (feedback)
-  newMatrix[0][2][1] = 0.5; 
+  newMatrix[0][2][1] = 0.5;
 }
 if (graphData.outputChannels > 1 && graphData.nodes.length > 3) {
   // Channel 1: input1 (idx 0) -> biquadR (idx 3)
