@@ -1,20 +1,17 @@
-import { useGraphStore } from '../stores/graph';
+import { useGraphStore, type GraphState } from '../stores/graph';
 import { useUIStore } from '../stores/ui';
 import {
-  MessageType,
-  type ProcessorMessage,
-  type WorkerMessage,
-  type SerializedAudioGraph,
+  MainThreadMessageType,
+  WorkletMessageType,
+  type InitProcessorMessage,
+  type UpdateGraphMessage,
+  type UpdateParameterMessage,
+  type RenderOfflineMessage,
+  type WorkletMessage,
   type NodeId,
   type ParameterId,
-  type ProcessorInitRequest,
-  type GraphUpdateRequest,
-  type ParamUpdateRequest,
-  type OfflineRenderRequest,
-  type WorkerInitResponse,
-  type WorkerUpdateResponse,
-  type WorkerErrorResponse,
-  type WorkerOfflineRenderResponse,
+  type ParameterValue,
+  type AudioGraph,
 } from '../audio/schema';
 
 const DEBOUNCE_MS = 5;
@@ -38,46 +35,66 @@ export function initAudioBridge(
   processorPortRef = processorPort;
 
   // Listen for messages from the MFNProcessor
-  processorPort.onmessage = (event: MessageEvent<WorkerMessage>) => {
-    const { type, payload } = event.data;
+  processorPort.onmessage = (event: MessageEvent<WorkletMessage>) => {
+    const message = event.data;
     const { setLastErrorMessage, setAudioContextRunning } = useUIStore.getState();
 
-    switch (type) {
-      case MessageType.WORKER_INIT_SUCCESS:
-        console.log('MFNProcessor initialized successfully:', payload as WorkerInitResponse);
-        // You might want to update some UI state here
-        setAudioContextRunning(true); // Or based on actual audioContext.state
+    switch (message.type) {
+      case WorkletMessageType.PROCESSOR_READY: {
+        console.log('MFNProcessor initialized successfully:', message.payload);
+        setAudioContextRunning(true);
         break;
-      case MessageType.WORKER_UPDATE_SUCCESS:
-        console.log('MFNProcessor updated successfully:', payload as WorkerUpdateResponse);
+      }
+      case WorkletMessageType.GRAPH_UPDATED: {
+        console.log('MFNProcessor graph updated successfully:', message.payload);
         break;
-      case MessageType.WORKER_ERROR:
-        console.error('MFNProcessor Error:', (payload as WorkerErrorResponse).message);
-        setLastErrorMessage((payload as WorkerErrorResponse).message);
+      }
+      case WorkletMessageType.WORKLET_ERROR:
+      case WorkletMessageType.NODE_ERROR: { // Combined error handling
+        // Payload structure is { message: string, nodeId?: NodeId }
+        const errorPayload = message.payload;
+        if (errorPayload && typeof errorPayload.message === 'string') {
+          console.error('MFNProcessor Error:', errorPayload.message);
+          setLastErrorMessage(errorPayload.message);
+        } else {
+          console.error('MFNProcessor Error: Received malformed error payload', errorPayload);
+          setLastErrorMessage('An unspecified error occurred in the audio processor.');
+        }
         break;
-      case MessageType.WORKER_OFFLINE_RENDER_COMPLETE:
-        console.log('Offline render complete:', payload as WorkerOfflineRenderResponse);
-        // Handle the rendered audio data (e.g., save to file, play back)
+      }
+      case WorkletMessageType.DATA_AVAILABLE: {
+        // Payload structure is { dataType: string, data: T, message?: string }
+        const dataPayload = message.payload;
+        if (dataPayload && dataPayload.dataType === 'offlineRenderComplete') {
+          console.log('Offline render complete:', dataPayload.data as ArrayBuffer);
+        }
         break;
-      default:
-        console.warn('Received unknown message type from MFNProcessor:', type);
+      }
+      default: {
+        // const _exhaustiveCheck: never = message.type;
+        console.warn('Received unknown message type from MFNProcessor:', message.type);
+        break;
+      }
     }
   };
 
   // Subscribe to graph changes from Zustand store
   useGraphStore.subscribe(
-    (state) => state.graph, // Selector: listen to the whole graph object
-    (currentGraph, previousGraph) => {
-      // Basic check to prevent updates if the graph hasn't actually changed.
-      // Zustand's subscribe fires even for shallowly equal objects if the reference changes.
-      // A more robust deep comparison or versioning might be needed for complex scenarios.
-      if (currentGraph === previousGraph) {
+    // The selector `(state: GraphState) => state` was removed.
+    // The listener function below is now the sole argument to subscribe,
+    // and it directly receives the current and previous state.
+    (currentState: GraphState, previousState: GraphState) => {
+      // Compare relevant parts of the graph for changes
+      if (
+        currentState.nodes === previousState.nodes &&
+        currentState.routingMatrix === previousState.routingMatrix &&
+        currentState.masterGain === previousState.masterGain &&
+        currentState.outputChannels === previousState.outputChannels
+      ) {
         return;
       }
-      // console.log('Graph store changed, scheduling update to processor.');
       sendGraphUpdateToProcessorDebounced();
     },
-    // { equalityFn: (a, b) => JSON.stringify(a) === JSON.stringify(b) } // Could use deep equal for more precise updates
   );
 }
 
@@ -96,12 +113,15 @@ function sendGraphUpdateToProcessorDebounced(): void {
   }
 
   debounceTimeoutId = window.setTimeout(() => {
-    if (!processorPortRef) return; // Check again inside timeout
-    const serializedGraph = useGraphStore.getState().getSerializedGraph();
-    // console.log('Debounced: Sending GRAPH_UPDATE to MFNProcessor:', serializedGraph);
-    const message: GraphUpdateRequest = {
-      type: MessageType.GRAPH_UPDATE,
-      payload: serializedGraph,
+    if (!processorPortRef) return;
+    const graphToSend: AudioGraph = useGraphStore.getState(); // Send the whole graph state which conforms to AudioGraph
+    // If getSerializedGraph() is preferred, ensure its return type is AudioGraph or cast appropriately
+    // const serializedGraph = useGraphStore.getState().getSerializedGraph();
+
+    const message: UpdateGraphMessage = {
+      type: MainThreadMessageType.UPDATE_GRAPH,
+      // payload: { graph: serializedGraph as any }, // Kept as any if serializedGraph is used and differs
+      payload: { graph: graphToSend }, // Assumes AudioGraph is expected by worklet
     };
     processorPortRef.postMessage(message);
     debounceTimeoutId = null;
@@ -117,17 +137,16 @@ function sendGraphUpdateToProcessorDebounced(): void {
  */
 export function sendParameterUpdateToProcessor(
   nodeId: NodeId,
-  paramId: ParameterId,
-  value: number,
+  parameterId: ParameterId, // Corrected: schema uses parameterId
+  value: ParameterValue,
 ): void {
   if (!processorPortRef) {
     console.warn('Processor port not initialized. Cannot send parameter update.');
     return;
   }
-  // console.log(\`Sending PARAM_UPDATE for ${nodeId}.${paramId} = ${value}\`);
-  const message: ParamUpdateRequest = {
-    type: MessageType.PARAM_UPDATE,
-    payload: { nodeId, paramId, value },
+  const message: UpdateParameterMessage = {
+    type: MainThreadMessageType.UPDATE_PARAMETER,
+    payload: { nodeId, parameterId, value }, // Corrected: use parameterId
   };
   processorPortRef.postMessage(message);
 }
@@ -136,24 +155,29 @@ export function sendParameterUpdateToProcessor(
  * Sends an INIT message to the MFNProcessor.
  * This is typically called once after the AudioWorkletNode is created and the bridge is initialized.
  *
- * @param numberOfChannels The number of channels to initialize the processor with.
  * @param sampleRate The sample rate of the AudioContext.
  */
 export function sendInitRequestToProcessor(
-  numberOfChannels: number,
   sampleRate: number,
+  maxChannels: number
 ): void {
   if (!processorPortRef) {
     console.warn('Processor port not initialized. Cannot send init request.');
     return;
   }
-  // console.log(\`Sending INIT to MFNProcessor: ${numberOfChannels} channels, ${sampleRate} Hz\`);
-  const message: ProcessorInitRequest = {
-    type: MessageType.INIT,
+  const initialGraph: AudioGraph = useGraphStore.getState();
+
+  const message: InitProcessorMessage = {
+    type: MainThreadMessageType.INIT_PROCESSOR,
     payload: {
-      numberOfChannels,
+      graph: {
+        nodes: initialGraph.nodes,
+        routingMatrix: initialGraph.routingMatrix,
+        outputChannels: initialGraph.outputChannels,
+        masterGain: initialGraph.masterGain,
+      },
       sampleRate,
-      // initialGraph: useGraphStore.getState().getSerializedGraph(), // Optionally send initial graph
+      maxChannels,
     },
   };
   processorPortRef.postMessage(message);
@@ -163,25 +187,18 @@ export function sendInitRequestToProcessor(
  * Sends an RENDER_OFFLINE message to the MFNProcessor.
  *
  * @param durationSeconds The duration of the audio to render offline, in seconds.
- * @param sampleRate The sample rate for the offline render (can be different from AudioContext's).
- *                   If not provided, the processor's current sample rate will be used.
  */
 export function sendOfflineRenderRequestToProcessor(
   durationSeconds: number,
-  targetSampleRate?: number,
 ): void {
-  if (!processorPortRef || !audioContextRef) {
-    console.warn(
-      'Processor port or audio context not initialized. Cannot send offline render request.',
-    );
+  if (!processorPortRef) {
+    console.warn('Processor port not initialized. Cannot send offline render request.');
     return;
   }
-  // console.log(\`Sending RENDER_OFFLINE to MFNProcessor: ${durationSeconds}s\`);
-  const message: OfflineRenderRequest = {
-    type: MessageType.RENDER_OFFLINE,
+  const message: RenderOfflineMessage = {
+    type: MainThreadMessageType.RENDER_OFFLINE,
     payload: {
       durationSeconds,
-      sampleRate: targetSampleRate || audioContextRef.sampleRate,
     },
   };
   processorPortRef.postMessage(message);
