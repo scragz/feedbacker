@@ -48,7 +48,7 @@ export function NodeInspector({
                 }
                 min={paramDef.minValue}
                 max={paramDef.maxValue}
-                step={1}
+                step={0.01}
                 label={(value) => `${value.toFixed(paramDef.unit === '%' || paramDef.unit === 'dB' ? 1 : 2)} ${paramDef.unit ?? ''}`.trim()}
                 // Consider adding marks if paramDef.marks is available
               />

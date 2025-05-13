@@ -11,6 +11,7 @@ import Pedalboard from './components/Pedalboard/Pedalboard';
 import NodeList from './components/NodeList/NodeList';
 import NodeInspector from './components/NodeInspector/NodeInspector';
 import StatusDisplay from './components/StatusDisplay/StatusDisplay';
+import MatrixCanvas from './components/MatrixCanvas'; // Added import
 
 import { useAudioInitialization } from './hooks/useAudioInitialization';
 import { useProcessorInitialization } from './hooks/useProcessorInitialization';
@@ -22,13 +23,12 @@ import {
   type ParameterValue,
   type NodeType,
   MainThreadMessageType,
-  type WorkletMessage, // Keep this for event listener type if needed elsewhere
-  WorkletMessageType, // Keep this for event listener type if needed elsewhere
   type AudioGraph,
   type AudioNodeInstance,
   NODE_PARAMETER_DEFINITIONS,
   type MainThreadMessage,
   type RoutingMatrix,
+  type UpdateGraphMessage, // Added import
 } from './audio/schema';
 
 // Initial state setup directly in App.tsx
@@ -37,17 +37,17 @@ const initialMasterGain = 0.8;
 
 const createInitialOutputMixerNode = (): AudioNodeInstance => {
   const nodeId = nanoid(10);
+  const paramsDefinition = NODE_PARAMETER_DEFINITIONS.output_mixer; // Assuming this always exists
   return {
     id: nodeId,
     type: 'output_mixer',
-    parameters: NODE_PARAMETER_DEFINITIONS.output_mixer // Assuming output_mixer is always defined
-      ? Object.fromEntries(
-          Object.entries(NODE_PARAMETER_DEFINITIONS.output_mixer).map(([paramId, def]) => [
-            paramId,
-            def.defaultValue,
-          ]),
-        )
-      : {},
+    // Directly use paramsDefinition if it's guaranteed to exist
+    parameters: Object.fromEntries(
+      Object.entries(paramsDefinition).map(([paramId, def]) => [
+        paramId,
+        def.defaultValue,
+      ])
+    ),
     label: 'Output Mixer',
     uiPosition: { x: 50, y: 50 },
   };
@@ -88,40 +88,12 @@ function App() {
     workletNodeRef,
     audioInitialized,
   } = useAudioInitialization({
-    setAudioGraph,
+    setAudioGraph, // This will be the primary way graph state is updated from worklet
     setAudioError,
     setProcessorReady,
     setAudioContextState,
   });
 
-  // Effect to listen for the processor's readiness confirmation message
-  // This remains important as useAudioInitialization sets up the listener for graph updates,
-  // but explicit processor readiness confirmation might still be handled here or in the hook.
-  // The hook already sets processorReady on PROCESSOR_READY message.
-  // This useEffect might be redundant if useAudioInitialization fully covers it.
-  // For now, let's assume useAudioInitialization handles setProcessorReady correctly.
-
-  useEffect(() => {
-    if (audioInitialized && workletNodeRef.current && !processorReady) {
-      const port = workletNodeRef.current.port;
-      // This messageHandler is specific to processor readiness.
-      const messageHandler = (event: MessageEvent<WorkletMessage>) => {
-        if (event.data.type === WorkletMessageType.PROCESSOR_READY) {
-          console.log('[App.tsx] Received PROCESSOR_READY from worklet. Setting processorReady to true.');
-          setProcessorReady(true);
-        }
-      };
-      port.addEventListener('message', messageHandler);
-      console.log('[App.tsx] Attached message listener for processor readiness confirmation.');
-      return () => {
-        port.removeEventListener('message', messageHandler);
-        console.log('[App.tsx] Removed message listener for processor readiness confirmation.');
-      };
-    }
-  }, [audioInitialized, workletNodeRef, processorReady, setProcessorReady]);
-
-  // This hook sends CHECK_PROCESSOR_STATUS.
-  // It relies on `processorReady` being false initially to send the check.
   useProcessorStatusCheck({
     audioContextState,
     workletNodeRef,
@@ -129,11 +101,18 @@ function App() {
   });
 
   const { initMessageSent } = useProcessorInitialization({
-    audioInitialized, // Corrected: Pass audioInitialized instead of processorReady
+    audioInitialized,
     workletNodeRef,
     audioContextRef,
-    audioGraph, // Pass the local audioGraph state
+    audioGraph,
   });
+
+  // Effect to clear selectedNodeId if it's no longer in the graph
+  useEffect(() => {
+    if (selectedNodeId && !audioGraph.nodes.find(n => n.id === selectedNodeId)) {
+      setSelectedNodeId(null);
+    }
+  }, [audioGraph, selectedNodeId]); // Removed setSelectedNodeId from deps as it causes loop if used directly
 
   const handleResumeAudio = useCallback(async () => {
     if (audioContextRef.current) {
@@ -156,7 +135,7 @@ function App() {
 
   const getNodeById = useCallback((nodeId: NodeId | null): AudioNodeInstance | null => {
     if (!nodeId) return null;
-    return audioGraph.nodes.find(n => n.id === nodeId) ?? null; // Changed || to ??
+    return audioGraph.nodes.find(n => n.id === nodeId) ?? null;
   }, [audioGraph.nodes]);
 
   const handleAddNode = useCallback((type: NodeType) => {
@@ -179,26 +158,24 @@ function App() {
       id: newNodeId,
       type,
       parameters: defaultParameters,
-      label: type, // Or a more descriptive label
+      label: type,
       uiPosition: { x: Math.random() * 300, y: Math.random() * 200 },
     };
 
-    setAudioGraph(prevGraph => {
-      const newNodes = [...prevGraph.nodes, newNodeInstance];
-      // The routing matrix will be updated by the worklet via GRAPH_UPDATED message
-      // or if this app takes full ownership, it should resize it here.
-      // For now, assume worklet handles it or sends a full graph back.
-      return { ...prevGraph, nodes: newNodes };
-    });
+    // DO NOT update local state optimistically. Wait for GRAPH_UPDATED from worklet.
+    // setAudioGraph(prevGraph => {
+    //   const newNodes = [...prevGraph.nodes, newNodeInstance];
+    //   return { ...prevGraph, nodes: newNodes };
+    // });
 
-    console.log('[App.tsx] Adding node to worklet:', newNodeInstance);
+    console.log('[App.tsx] Requesting worklet to add node:', newNodeInstance);
     const message: MainThreadMessage = {
         type: MainThreadMessageType.ADD_NODE,
         payload: { nodeInstance: newNodeInstance },
     };
     workletNodeRef.current.port.postMessage(message);
 
-  }, [workletNodeRef, audioInitialized, processorReady, setAudioGraph]);
+  }, [workletNodeRef, audioInitialized, processorReady, setAudioError]); // Removed setAudioGraph from deps
 
   const handleRemoveNode = useCallback((nodeId: NodeId) => {
     if (!workletNodeRef.current || !audioInitialized || !processorReady) {
@@ -206,24 +183,29 @@ function App() {
       return;
     }
 
-    setAudioGraph(prevGraph => ({
-      ...prevGraph,
-      nodes: prevGraph.nodes.filter(n => n.id !== nodeId),
-    }));
-    setSelectedNodeId(prevSelected => prevSelected === nodeId ? null : prevSelected);
+    // DO NOT update local state optimistically. Wait for GRAPH_UPDATED from worklet.
+    // setAudioGraph(prevGraph => ({
+    //   ...prevGraph,
+    //   nodes: prevGraph.nodes.filter(n => n.id !== nodeId),
+    // }));
+    // setSelectedNodeId(prevSelected => prevSelected === nodeId ? null : prevSelected);
 
+    console.log('[App.tsx] Requesting worklet to remove node:', nodeId);
     const message: MainThreadMessage = {
         type: MainThreadMessageType.REMOVE_NODE,
         payload: { nodeId },
     };
     workletNodeRef.current.port.postMessage(message);
-  }, [workletNodeRef, audioInitialized, processorReady, setAudioGraph]);
+  }, [workletNodeRef, audioInitialized, processorReady, setAudioError]); // Removed setAudioGraph & setSelectedNodeId from deps
 
   const handleParameterChange = useCallback((nodeId: NodeId, parameterId: ParameterId, value: ParameterValue) => {
     if (!workletNodeRef.current || !audioInitialized || !processorReady) {
       setAudioError('Audio system not ready. Cannot change parameter.');
       return;
     }
+    // Optimistically update local state for responsiveness for parameter changes.
+    // The worklet will also send PARAMETER_UPDATED, which useAudioInitialization handles,
+    // potentially causing a re-set, but this is usually fine for params.
     setAudioGraph(prevGraph => ({
       ...prevGraph,
       nodes: prevGraph.nodes.map(n =>
@@ -238,7 +220,7 @@ function App() {
       payload: { nodeId, parameterId, value },
     };
     workletNodeRef.current.port.postMessage(message);
-  }, [workletNodeRef, audioInitialized, processorReady, setAudioGraph]);
+  }, [workletNodeRef, audioInitialized, processorReady, setAudioGraph, setAudioError]);
 
   const handleGlobalParameterChange = useCallback((parameterId: string, value: number) => {
     if (!workletNodeRef.current || !audioInitialized || !processorReady) {
@@ -288,6 +270,46 @@ function App() {
     console.log('Chaos value changed (0-100 for UI, 0-1 for worklet):', value);
   };
 
+  const handleMatrixCellClick = useCallback(
+    (channelIndex: number, sourceNodeId: NodeId, targetNodeId: NodeId, newWeight: number) => {
+      if (!workletNodeRef.current || !audioInitialized || !processorReady) {
+        setAudioError('Audio system not ready. Cannot update matrix.');
+        return;
+      }
+
+      setAudioGraph(prevGraph => {
+        const newMatrix = prevGraph.routingMatrix.map(channelMatrix =>
+          channelMatrix.map(row => [...row])
+        );
+
+        const sourceNodeIndex = prevGraph.nodes.findIndex(n => n.id === sourceNodeId);
+        const targetNodeIndex = prevGraph.nodes.findIndex(n => n.id === targetNodeId);
+
+        if (sourceNodeIndex === -1 || targetNodeIndex === -1) {
+          console.error('[App.tsx] handleMatrixCellClick: Invalid node ID for matrix update.');
+          return prevGraph;
+        }
+
+        // Assuming channelIndex, sourceNodeIndex, and targetNodeIndex are valid
+        // and newMatrix is structured correctly based on prevGraph.
+        // If these assumptions hold, direct assignment is safe.
+        newMatrix[channelIndex][sourceNodeIndex][targetNodeIndex] = newWeight;
+
+        const updatedGraph = { ...prevGraph, routingMatrix: newMatrix };
+
+        const message: UpdateGraphMessage = {
+          type: MainThreadMessageType.UPDATE_GRAPH,
+          payload: { graph: updatedGraph },
+        };
+        workletNodeRef.current?.port.postMessage(message);
+        console.log('[App.tsx] Sent UPDATE_GRAPH message after matrix cell click:', updatedGraph);
+
+        return updatedGraph;
+      });
+    },
+    [workletNodeRef, audioInitialized, processorReady, setAudioGraph]
+  );
+
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
       <LayoutShell
@@ -332,9 +354,7 @@ function App() {
             />
           )}
           <Pedalboard>
-            {/* MatrixCanvas could be rendered here if it needs access to App.tsx state */}
-            {/* or passed audioGraph directly */}
-            {/* <MatrixCanvas audioGraph={audioGraph} /> */}
+            <MatrixCanvas audioGraph={audioGraph} onMatrixCellClick={handleMatrixCellClick} />
           </Pedalboard>
         </Stack>
       </LayoutShell>

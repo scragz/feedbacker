@@ -22,6 +22,7 @@
   max-height: 200px; /* Example max height */
   overflow-y: auto; /* Scroll if content exceeds max height */
   display: flex;
+  gap: var(--mantine-spacing-xs);
 }
 
 .listItem {

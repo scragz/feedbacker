@@ -1,26 +1,31 @@
 import React, { useRef, useEffect, useCallback } from 'react';
-import { useGraphStore } from '../stores/graph';
+import { type AudioGraph, type NodeId } from '../audio/schema';
 import { drawGrid } from '../lib/canvas-utils';
 
 interface MatrixCanvasProps {
   width?: number;
   height?: number;
-  numChannels?: number;
+  audioGraph: AudioGraph;
+  onMatrixCellClick?: (
+    channelIndex: number,
+    sourceNodeId: NodeId,
+    targetNodeId: NodeId,
+    newWeight: number
+  ) => void;
 }
 
 const MatrixCanvas: React.FC<MatrixCanvasProps> = ({
   width = 600,
   height = 400,
-  numChannels: propNumChannels = 2,
+  audioGraph,
+  onMatrixCellClick,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Split useGraphStore calls to ensure stable references for selectors
-  const nodes = useGraphStore(state => state.nodes);
-  const routingMatrix = useGraphStore(state => state.routingMatrix);
-  const setMatrixValue = useGraphStore(state => state.setMatrixValue);
+  const nodes = audioGraph.nodes;
+  const routingMatrix = audioGraph.routingMatrix;
 
-  const numEffectiveChannels = routingMatrix.length > 0 ? routingMatrix.length : propNumChannels;
+  const numEffectiveChannels = routingMatrix.length > 0 ? routingMatrix.length : audioGraph.outputChannels;
   const numNodes = nodes.length;
 
   const draw = useCallback((ctx: CanvasRenderingContext2D) => {
@@ -71,7 +76,7 @@ const MatrixCanvas: React.FC<MatrixCanvasProps> = ({
 
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!canvasRef.current || numNodes === 0 || numEffectiveChannels === 0) return;
+      if (!canvasRef.current || numNodes === 0 || numEffectiveChannels === 0 || !onMatrixCellClick) return;
 
       const rect = canvasRef.current.getBoundingClientRect();
       const x = event.clientX - rect.left;
@@ -83,10 +88,10 @@ const MatrixCanvas: React.FC<MatrixCanvasProps> = ({
       if (clickedChannelIndex < 0 || clickedChannelIndex >= numEffectiveChannels) return;
 
       const yInChannel = y - clickedChannelIndex * channelStripHeight;
-      const cellHeightInChannel = channelStripHeight / numNodes;
+      const cellHeightInChannelStrip = channelStripHeight / numNodes;
       const cellWidthGlobal = width / numNodes;
 
-      const clickedSourceNodeIndex = Math.floor(yInChannel / cellHeightInChannel);
+      const clickedSourceNodeIndex = Math.floor(yInChannel / cellHeightInChannelStrip);
       const clickedTargetNodeIndex = Math.floor(x / cellWidthGlobal);
 
       if (
@@ -99,16 +104,21 @@ const MatrixCanvas: React.FC<MatrixCanvasProps> = ({
       const sourceNode = nodes[clickedSourceNodeIndex];
       const targetNode = nodes[clickedTargetNodeIndex];
 
+      if (!sourceNode || !targetNode) {
+        console.error('Source or target node not found for click event', {sourceNode, targetNode, clickedSourceNodeIndex, clickedTargetNodeIndex, nodes});
+        return;
+      }
+
       const currentWeight = routingMatrix[clickedChannelIndex]?.[clickedSourceNodeIndex]?.[clickedTargetNodeIndex] ?? 0;
       const newWeight = currentWeight > 0 ? 0 : 1;
 
       console.log(
-        `Clicked Channel: ${clickedChannelIndex}, Source: ${sourceNode.id} (idx ${clickedSourceNodeIndex}), Target: ${targetNode.id} (idx ${clickedTargetNodeIndex}), New Weight: ${newWeight}`
+        `MatrixCanvas Click: Channel: ${clickedChannelIndex}, Source: ${sourceNode.id} (idx ${clickedSourceNodeIndex}), Target: ${targetNode.id} (idx ${clickedTargetNodeIndex}), New W: ${newWeight}`
       );
 
-      setMatrixValue(clickedChannelIndex, sourceNode.id, targetNode.id, newWeight);
+      onMatrixCellClick(clickedChannelIndex, sourceNode.id, targetNode.id, newWeight);
     },
-    [height, width, nodes, routingMatrix, numEffectiveChannels, numNodes, setMatrixValue]
+    [height, width, nodes, routingMatrix, numEffectiveChannels, numNodes, onMatrixCellClick]
   );
 
   return (
