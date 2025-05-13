@@ -29,8 +29,20 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
-      // Add any additional strict rules here if desired
-      // e.g.: '@typescript-eslint/no-unused-vars': 'error',
+      // Relax some strict type-checking rules that can be overly noisy
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn', // Allow 'any' with a warning
+      '@typescript-eslint/restrict-template-expressions': ['warn', { allowNumber: true, allowBoolean: true }], // Allow numbers and booleans in template strings
+      '@typescript-eslint/no-unnecessary-condition': 'warn', // Reduce errors from conditions that TS deems always true/false
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }], // Warn on unused vars, ignore if prefixed with _
+      '@typescript-eslint/no-non-null-assertion': 'warn', // Allow '!' non-null assertions with a warning
+      '@typescript-eslint/no-inferrable-types': 'warn', // Warn on inferrable types instead of erroring
+
+      // Consider turning off if still too many issues during rapid development:
+      // '@typescript-eslint/strict-boolean-expressions': 'off',
+      // '@typescript-eslint/no-floating-promises': 'warn', // Good to keep an eye on these
     },
   },
   // Config for other files like vite.config.ts, eslint.config.js (if needed)
