@@ -1,0 +1,46 @@
+// filepath: /Users/scragz/Projects/feedbacker/src/components/Controls/Controls.module.css
+.controlsContainer {
+  background-color: #444; /* Slightly lighter than pedalboard for contrast */
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.controlsTitle {
+  color: #e0e0e0;
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.2em;
+  text-align: center;
+  border-bottom: 1px solid #555;
+  padding-bottom: 5px;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+}
+
+/* Basic button styling - will be replaced by Mantine later */
+.controlButton {
+  background-color: #5a5a5a;
+  color: white;
+  border: 1px solid #333;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.controlButton:hover {
+  background-color: #6b6b6b;
+}
+
+.controlButton:active {
+  background-color: #4a4a4a;
+}

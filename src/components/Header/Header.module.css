@@ -1,0 +1,24 @@
+// filepath: /Users/scragz/Projects/feedbacker/src/components/Header/Header.module.css
+.header {
+  padding: 10px 0;
+  margin-bottom: 15px;
+}
+
+.logo {
+  font-family: 'Arial Black', Gadget, sans-serif; /* Placeholder, choose a cool font */
+  font-size: 3em;
+  color: #e0e0e0;
+  background-color: #707070; /* Darker metallic */
+  border: 2px solid #505050;
+  border-radius: 8px;
+  padding: 10px 20px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.3),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.2),
+    0 2px 3px rgba(0, 0, 0, 0.3);
+  background-image: linear-gradient(to bottom, #888888, #606060);
+  text-shadow: 1px 1px 0px #444; /* Simple text shadow */
+}

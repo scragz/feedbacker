@@ -194,8 +194,8 @@ function App() {
 
   return (
     <>
-      <h1 className="">FEEDBACKER</h1>
-      <div className="card metallicss">
+      <h1 className="chrome">FEEDBACKER</h1>
+      <div className="card">
         <button onClick={() => { setCount((c) => c + 1); }}>
           count is {count}
         </button>

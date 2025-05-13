@@ -1,0 +1,27 @@
+// filepath: /Users/scragz/Projects/feedbacker/src/components/StatusDisplay/StatusDisplay.module.css
+.statusDisplayContainer {
+  background-color: #1a1a1a; /* Dark background for status */
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+  margin-top: 15px;
+}
+
+.statusText {
+  font-family: 'Courier New', Courier, monospace; /* Monospace for a techy feel */
+  font-size: 0.9em;
+  white-space: pre-wrap; /* Preserve line breaks */
+}
+
+.errorText {
+  color: #ff6b6b; /* Red for errors */
+}
+
+.successText {
+  color: #69db7c; /* Green for success/ready states */
+}
+
+.infoText {
+  color: #74c0fc; /* Blue for general info */
+}
