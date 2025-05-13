@@ -48,7 +48,7 @@
 
 ## Phase 4 · Node Kernel Library
 
-- [/] **Step 6: Add initial DSP kernels**
+- [x] **Step 6: Add initial DSP kernels**
 
   - **Task**: Implement `delay`, `gain`, `biquad` in `audio/nodes/`. Each exports pure function `(buf, params, state)`.
   - **Files**: up to 6 kernel files + index barrel.
