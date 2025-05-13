@@ -10,8 +10,6 @@ interface LayoutShellProps {
 export function LayoutShell({ children }: LayoutShellProps) {
   return (
     <AppShell
-      header={{ height: 60 }}
-      padding="md"
       className={classes.shell}
     >
       <AppShell.Header className={classes.header}>

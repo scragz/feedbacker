@@ -1,11 +1,12 @@
 import React from 'react';
+import { Title } from '@mantine/core';
 import classes from './Header.module.css';
 
 const Header: React.FC = () => {
   return (
-    <h1 className={classes.header}>
+    <Title className={classes.header}>
       <div className={classes.logo}>FEEDBACKER</div>
-    </h1>
+    </Title>
   );
 };
 

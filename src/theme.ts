@@ -38,7 +38,11 @@ export const theme = createTheme({
   headings: {
     fontFamily: "Frijole, sans-serif",
     sizes: {
-      h1: { fontSize: '36' },
+      h1: {
+        fontWeight: '100',
+        fontSize: '6rem',
+        lineHeight: '1.4',
+      },
     },
   }
 });

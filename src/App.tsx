@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { MantineProvider, AppShell, LoadingOverlay } from '@mantine/core';
 import { theme } from './theme';
-import './App.css';
 
 import Header from './components/Header/Header';
 import Controls from './components/Controls/Controls';
@@ -12,6 +11,7 @@ import StatusDisplay from './components/StatusDisplay/StatusDisplay';
 
 import { useAudioInitialization } from './hooks/useAudioInitialization';
 import { useProcessorInitialization } from './hooks/useProcessorInitialization';
+import { useProcessorStatusCheck } from './hooks/useProcessorStatusCheck'; // + Import useProcessorStatusCheck
 
 import { useGraphStore } from './stores/graph';
 import { useUIStore } from './stores/ui';
@@ -22,9 +22,9 @@ import {
   type NodeType,
   MainThreadMessageType,
   type AudioGraph,
+  type WorkletMessage, // Added import for WorkletMessage
   WorkletMessageType,
 } from './audio/schema';
-import { getAudioContext } from './audio';
 
 function App() {
   // Zustand Store Hooks
@@ -40,49 +40,86 @@ function App() {
 
   const {
     selectedNodeId,
-    lastErrorMessage, // Keep this for potential direct display or logging
-    // isAudioContextRunning: isCtxRunningFromStore, // Removed as Controls uses audioContextState
+    // lastErrorMessage, // This was unused, consider removing if not needed elsewhere
     selectNode: setSelectedNodeIdInStore,
     setLastErrorMessage,
-    setAudioContextRunning: setCtxRunningInStore, // Keep for updating store after resume
+    setAudioContextRunning: setCtxRunningInStore,
   } = useUIStore();
 
   // Local state for App.tsx
   const [audioInitError, setAudioInitError] = useState<string | null>(null);
-  const [localProcessorReady, setLocalProcessorReady] = useState(false);
   const [currentAudioContextState, setCurrentAudioContextState] = useState<AudioContext['state'] | null>(null);
 
-  // This state represents the graph as known by the worklet, potentially.
-  // For now, it's a placeholder for what useAudioInitialization's setAudioGraph would update.
-  const [workletKnownGraph, setWorkletKnownGraph] = useState<AudioGraph>(() => useGraphStore.getState());
+  // New state to track if the processor handshake (status check response) is complete
+  const [processorHandshakeComplete, setProcessorHandshakeComplete] = useState(false);
+
+  // workletKnownGraph and its handler are not directly related to this fix,
+  // but ensure they are used or remove if they are remnants of other features.
+  // For now, keeping it as it was, but noting 'workletKnownGraph' is currently unused.
+  const [_workletKnownGraph, setWorkletKnownGraph] = useState<AudioGraph>(() => useGraphStore.getState());
 
 
   const handleWorkletGraphUpdate = useCallback((newGraphOrUpdater: AudioGraph | ((prevGraph: AudioGraph) => AudioGraph)) => {
-    console.warn('[App.tsx] handleWorkletGraphUpdate called by useAudioInitialization.');
-    // This function is called by useAudioInitialization when the worklet sends graph updates.
-    // It needs to reconcile the worklet's graph state with the Zustand store.
-    // This is a simplified placeholder. A robust solution would involve:
-    // 1. Transforming the AudioGraph (from worklet) to SerializedAudioGraph (for store.loadGraph)
-    // 2. Or, having more granular messages from worklet (NODE_ADDED_CONFIRMED, etc.)
-    //    that trigger specific store actions.
-    const newGraph = typeof newGraphOrUpdater === 'function' ? newGraphOrUpdater(workletKnownGraph) : newGraphOrUpdater;
-    setWorkletKnownGraph(newGraph); // Update local representation
-    // Example: Potentially call a store action to sync
-    // useGraphStore.getState().loadGraph(convertToSerialized(newGraph)); // convertToSerialized would need to be implemented
-    console.log('[App.tsx] Worklet known graph updated:', newGraph);
-  }, [workletKnownGraph]);
+    console.warn('[App.tsx] handleWorkletGraphUpdate received update from useAudioInitialization.');
+    setWorkletKnownGraph(prevGraph => { // Use functional update
+      const newGraph = typeof newGraphOrUpdater === 'function' ? newGraphOrUpdater(prevGraph) : newGraphOrUpdater;
+      // Example: Potentially call a store action to sync
+      // useGraphStore.getState().loadGraph(convertToSerialized(newGraph)); // convertToSerialized would need to be implemented
+      console.log('[App.tsx] Worklet known graph updated via functional update to:', newGraph);
+      return newGraph;
+    });
+  }, [setWorkletKnownGraph]); // Dependency is now stable setWorkletKnownGraph
+
+  const handleSetProcessorReadyFromAudioInit = useCallback(() => {
+    console.warn(`[App.tsx] useAudioInitialization's setProcessorReady callback was invoked. App.tsx now uses direct message listening for processor handshake completion.`);
+  }, []); // Memoized callback
 
 
-  const { audioContextRef, workletNodeRef, audioInitialized } = useAudioInitialization({
+  const {
+    audioContextRef,
+    workletNodeRef,
+    audioInitialized // This should mean the AudioWorkletNode is created and module loaded
+  } = useAudioInitialization({
     setAudioError: setAudioInitError,
-    setProcessorReady: setLocalProcessorReady,
+    // IMPORTANT: App.tsx now handles the handshake completion itself via direct message listening.
+    // This setProcessorReady from the hook might be for basic node readiness or could be problematic if it sets true too early for handshake.
+    setProcessorReady: handleSetProcessorReadyFromAudioInit, // Use the memoized callback
     setAudioContextState: setCurrentAudioContextState,
     setAudioGraph: handleWorkletGraphUpdate,
   });
 
-  // Initialize processor once ready
+  // Effect to listen for the processor's readiness confirmation message
+  useEffect(() => {
+    if (audioInitialized && workletNodeRef.current && !processorHandshakeComplete) {
+      const port = workletNodeRef.current.port;
+      // This messageHandler is specific to processor readiness.
+      const messageHandler = (event: MessageEvent<WorkletMessage>) => { // Changed type to WorkletMessage
+        if (event.data.type === WorkletMessageType.PROCESSOR_READY) {
+          console.log('[App.tsx] Received PROCESSOR_READY from worklet. Setting processorHandshakeComplete to true.');
+          setProcessorHandshakeComplete(true);
+        }
+      };
+      port.addEventListener('message', messageHandler);
+      console.log('[App.tsx] Attached message listener for processor readiness confirmation.');
+      return () => {
+        port.removeEventListener('message', messageHandler);
+        console.log('[App.tsx] Removed message listener for processor readiness confirmation.');
+      };
+    }
+  }, [audioInitialized, workletNodeRef, processorHandshakeComplete, setProcessorHandshakeComplete]);
+
+
+  // This hook sends CHECK_PROCESSOR_STATUS.
+  // It relies on `processorHandshakeComplete` being false initially to send the check.
+  useProcessorStatusCheck({
+    audioContextState: currentAudioContextState,
+    workletNodeRef,
+    processorReady: processorHandshakeComplete,
+  });
+
+  // Initialize processor with the graph once the handshake is complete.
   const { initMessageSent } = useProcessorInitialization({
-    processorReady: localProcessorReady,
+    processorReady: processorHandshakeComplete,
     workletNodeRef,
     audioContextRef,
     audioGraph: { nodes, routingMatrix, outputChannels, masterGain },
@@ -92,7 +129,7 @@ function App() {
   useEffect(() => {
     if (workletNodeRef.current) {
       const port = workletNodeRef.current.port;
-      const messageHandler = (_event: MessageEvent<WorkletMessageType>) => {
+      const messageHandler = (_event: MessageEvent<WorkletMessage>) => { // Changed type to WorkletMessage
         // console.log("[App.tsx] Received message from worklet in App component:", _event.data);
         // Potentially handle messages here that useAudioInitialization doesn't,
         // or if more complex store updates are needed.
@@ -111,38 +148,34 @@ function App() {
       if (audioContextRef.current.state === 'suspended') {
         try {
           await audioContextRef.current.resume();
-          setCtxRunningInStore(true); // Update store
+          setCtxRunningInStore(true);
           setLastErrorMessage(null);
           console.log('Audio context resumed.');
         } catch (e) {
           const error = e as Error;
           console.error('Error resuming audio context:', error);
           setLastErrorMessage(`Failed to resume audio: ${error.message}`);
-          setCtxRunningInStore(false); // Update store
+          setCtxRunningInStore(false);
         }
       } else {
-        setCtxRunningInStore(audioContextRef.current.state === 'running'); // Update store based on actual state
+        setCtxRunningInStore(audioContextRef.current.state === 'running');
       }
     } else {
-      console.log("Attempting to re-initialize audio context for resume");
-      try {
-        const context = getAudioContext();
-        await context.resume();
-        setCtxRunningInStore(true); // Update store
-      } catch (e) {
-        const error = e as Error;
-        setLastErrorMessage(`Failed to initialize/resume audio: ${error.message}`);
-        setCtxRunningInStore(false); // Update store
-      }
+      // This case might need re-evaluation: if audioContextRef.current is null,
+      // useAudioInitialization likely hasn't succeeded.
+      console.warn("Attempting to resume audio, but audioContextRef is not yet available.");
+      setLastErrorMessage('Audio system not initialized, cannot resume.');
+      setCtxRunningInStore(false);
     }
   }, [audioContextRef, setCtxRunningInStore, setLastErrorMessage]);
 
+
   const handleAddNode = useCallback((type: NodeType) => {
-    if (!workletNodeRef.current) {
-      setLastErrorMessage("Audio worklet not available to add node.");
+    if (!workletNodeRef.current || !processorHandshakeComplete) {
+      setLastErrorMessage("Audio worklet not ready or handshake not complete to add node.");
       return;
     }
-    const newNodeId = addNodeToStore(type); // This adds to Zustand store
+    const newNodeId = addNodeToStore(type);
     const newNodeInstance = getNodeById(newNodeId);
 
     if (newNodeInstance) {
@@ -155,20 +188,19 @@ function App() {
       console.error('[App.tsx] Failed to retrieve new node instance from store after adding.');
       setLastErrorMessage('Error adding node: instance not found after store update.');
     }
-  }, [addNodeToStore, getNodeById, workletNodeRef, setLastErrorMessage]);
+  }, [addNodeToStore, getNodeById, workletNodeRef, processorHandshakeComplete, setLastErrorMessage]);
 
   const handleParameterChange = useCallback((nodeId: NodeId, parameterId: ParameterId, value: ParameterValue) => {
-    if (!workletNodeRef.current) {
-      setLastErrorMessage("Audio worklet not available to update parameter.");
+    if (!workletNodeRef.current || !processorHandshakeComplete) {
+      setLastErrorMessage("Audio worklet not ready or handshake not complete to update parameter.");
       return;
     }
-    updateParamInStore(nodeId, parameterId, value); // Update Zustand store
-    // Send update to AudioWorklet
+    updateParamInStore(nodeId, parameterId, value);
     workletNodeRef.current.port.postMessage({
       type: MainThreadMessageType.UPDATE_PARAMETER,
       payload: { nodeId, parameterId, value },
     });
-  }, [updateParamInStore, workletNodeRef, setLastErrorMessage]);
+  }, [updateParamInStore, workletNodeRef, processorHandshakeComplete, setLastErrorMessage]);
 
   const handleNodeSelect = useCallback((nodeId: NodeId | null) => {
     setSelectedNodeIdInStore(nodeId);
@@ -176,8 +208,12 @@ function App() {
 
   const selectedNodeInstance = selectedNodeId ? getNodeById(selectedNodeId) : null;
 
-
-  const isLoading = !audioInitialized || !localProcessorReady || !initMessageSent;
+  // isLoading now depends on audioInitialized, processorHandshakeComplete, and initMessageSent
+  // Adjusted logic for when the LoadingOverlay should be visible
+  const showLoadingOverlay =
+    !audioInitialized ||
+    (currentAudioContextState === 'running' &&
+      (!processorHandshakeComplete || !initMessageSent));
 
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
@@ -190,12 +226,12 @@ function App() {
         </AppShell.Header>
 
         <AppShell.Main>
-          <LoadingOverlay visible={isLoading} overlayProps={{ radius: "sm", blur: 2 }} />
+          <LoadingOverlay visible={showLoadingOverlay} overlayProps={{ radius: "sm", blur: 2 }} />
           <StatusDisplay
             audioError={audioInitError}
             audioInitialized={audioInitialized}
             audioContextState={currentAudioContextState}
-            processorReady={localProcessorReady}
+            processorReady={processorHandshakeComplete}
             initMessageSent={initMessageSent}
           />
           <Controls

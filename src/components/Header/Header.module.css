@@ -18,4 +18,6 @@
     0 2px 3px rgba(0, 0, 0, 0.3);
   background-image: linear-gradient(to bottom, #888888, #606060);
   text-shadow: 1px 1px 0px #444; /* Simple text shadow */
+  --webkit-text-stroke: 10px #444;
+  paint-order: stroke fill;
 }
