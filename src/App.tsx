@@ -1,6 +1,6 @@
 import './App.css';
 import { Flex } from '@mantine/core';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // Component Imports (assuming default exports)
 import Pedalboard from './components/Pedalboard/Pedalboard';

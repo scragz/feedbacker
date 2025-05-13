@@ -73,7 +73,7 @@ export type NodeType =
  * Generic structure for defining a parameter of an audio node.
  */
 export interface ParameterDefinition<T = number> {
-  id: string; // Unique identifier for the parameter (e.g., 'frequency', 'gain')
+  id: ParameterId; // Unique identifier for the parameter (e.g., 'frequency', 'gain')
   label: string; // User-friendly label
   type: 'float' | 'integer' | 'boolean' | 'enum';
   minValue?: number;
@@ -94,11 +94,15 @@ export type ParameterValue = string | number | boolean;
  */
 export type NodeParameterDefinitions = Record<NodeType, Record<string, ParameterDefinition<ParameterValue>>>;
 
+// ADDED: Explicit type aliases for NodeId and ParameterId
+export type NodeId = string;
+export type ParameterId = string;
+
 /**
  * Describes an instance of an audio node in the graph.
  */
 export interface AudioNodeInstance {
-  id: string; // Unique ID for this node instance in the graph
+  id: NodeId; // Unique ID for this node instance in the graph
   type: NodeType; // Type of DSP kernel to use
   label?: string; // Optional user-defined label for the node
   parameters: Record<string, ParameterValue | undefined>; // Current parameter values { paramId: value }
@@ -159,8 +163,8 @@ export interface AddNodeMessage { // ADDED
 export interface UpdateParameterMessage {
   type: MainThreadMessageType.UPDATE_PARAMETER;
   payload: {
-    nodeId: string;
-    parameterId: string;
+    nodeId: NodeId;
+    parameterId: ParameterId;
     value: ParameterValue | undefined; // Ensure this matches
   };
 }
@@ -223,14 +227,14 @@ export interface NodeAddedMessage { // ADDED
 
 export interface NodeRemovedMessage { // ADDED
   type: WorkletMessageType.NODE_REMOVED;
-  payload: { nodeId: string };
+  payload: { nodeId: NodeId };
 }
 
 export interface ParameterUpdatedMessage { // ADDED
   type: WorkletMessageType.PARAMETER_UPDATED;
   payload: {
-    nodeId: string;
-    parameterId: string;
+    nodeId: NodeId;
+    parameterId: ParameterId;
     value: ParameterValue;
   };
 }
@@ -244,7 +248,7 @@ export interface WorkletErrorMessage { // To ensure consistency for error payloa
   type: WorkletMessageType.WORKLET_ERROR | WorkletMessageType.NODE_ERROR;
   payload: {
     message: string;
-    nodeId?: string; // Optional, if error is specific to a node
+    nodeId?: NodeId; // Optional, if error is specific to a node
   };
 }
 

@@ -1,197 +1,274 @@
 import { create } from 'zustand';
 import {
-  AudioGraph,
-  AudioNode,
-  NodeId,
-  NodeParameter,
-  ParameterId,
-  ProcessorMessage,
-  MessageType,
-  SerializedAudioGraph,
+  type AudioGraph,
+  type AudioNodeInstance,
+  type NodeType,
+  NODE_PARAMETER_DEFINITIONS,
+  type RoutingMatrix,
+  type NodeId,
+  type ParameterId,
+  type ParameterValue,
 } from '../audio/schema';
+import { immer } from 'zustand/middleware/immer';
+import { nanoid } from 'nanoid';
 
-interface GraphState {
-  graph: AudioGraph;
-  addNode: (node: AudioNode) => void;
+export interface SerializedAudioGraph {
+  nodes: AudioNodeInstance[];
+  connections: { from: NodeId; to: NodeId; weight: number; channel: number }[];
+  outputChannels: number;
+  masterGain: number;
+  nodeOrder?: NodeId[];
+}
+
+export interface GraphState extends AudioGraph {
+  getNodeById: (nodeId: NodeId) => AudioNodeInstance | undefined;
+  getNodeIndex: (nodeId: NodeId) => number;
+  addNode: (type: NodeType, id?: NodeId, uiPosition?: { x: number; y: number }) => NodeId;
   removeNode: (nodeId: NodeId) => void;
-  updateNodeParameter: (
-    nodeId: NodeId,
-    paramId: ParameterId,
-    value: number,
-  ) => void;
-  setMatrixConnection: (
+  updateNodeParameter: (nodeId: NodeId, parameterId: ParameterId, value: ParameterValue) => void;
+  setMatrixValue: (channel: number, sourceNodeId: NodeId, destNodeId: NodeId, weight: number) => void;
+  setConnectionWeightById: (
     fromNodeId: NodeId,
-    fromChannel: number,
     toNodeId: NodeId,
-    toChannel: number,
+    channelIndex: number,
     weight: number,
   ) => void;
   getSerializedGraph: () => SerializedAudioGraph;
-  loadGraph: (serializedGraph: SerializedAudioGraph) => void; // Basic load, more sophisticated logic later
-  // TODO: Add actions for more complex graph manipulations
+  loadGraph: (serializedGraph: SerializedAudioGraph) => void;
+  _resizeRoutingMatrix: (newNodeCount: number, oldNodeCount: number, oldMatrix: RoutingMatrix) => RoutingMatrix;
+  _initializeRoutingMatrix: (nodeCount: number, channelCount: number) => RoutingMatrix;
 }
 
-const initialGraph: AudioGraph = {
-  nodes: new Map(),
-  connections: [], // Representing the 3D matrix connections
-  nodeOrder: [],
-  outputNodeId: 'output', // Assuming a global output node
-  inputNodeId: 'input', // Assuming a global input node
+const initialOutputChannels = 2;
+const initialMasterGain = 0.8;
+
+const initializeRoutingMatrix = (nodeCount: number, channelCount: number): RoutingMatrix => {
+  const matrix: RoutingMatrix = [];
+  for (let i = 0; i < channelCount; i++) {
+    matrix[i] = [];
+    for (let j = 0; j < nodeCount; j++) {
+      // Ensure the inner array is correctly typed as number[]
+      const row: number[] = Array(nodeCount).fill(0) as number[];
+      matrix[i][j] = row;
+    }
+  }
+  return matrix;
 };
 
-export const useGraphStore = create<GraphState>((set, get) => ({
-  graph: initialGraph,
+export const useGraphStore = create(
+  immer<GraphState>((set, get) => ({
+    nodes: [],
+    routingMatrix: initializeRoutingMatrix(0, initialOutputChannels),
+    outputChannels: initialOutputChannels,
+    masterGain: initialMasterGain,
 
-  addNode: (node) =>
-    set((state) => {
-      const newNodes = new Map(state.graph.nodes);
-      newNodes.set(node.id, node);
-      const newNodeOrder = [...state.graph.nodeOrder, node.id];
-      return {
-        graph: {
-          ...state.graph,
-          nodes: newNodes,
-          nodeOrder: newNodeOrder,
-        },
-      };
-    }),
+    _initializeRoutingMatrix: initializeRoutingMatrix,
 
-  removeNode: (nodeId) =>
-    set((state) => {
-      const newNodes = new Map(state.graph.nodes);
-      newNodes.delete(nodeId);
-      const newNodeOrder = state.graph.nodeOrder.filter((id) => id !== nodeId);
-      // Also remove connections related to this node
-      const newConnections = state.graph.connections.filter(
-        (conn) => conn.from.nodeId !== nodeId && conn.to.nodeId !== nodeId,
-      );
-      return {
-        graph: {
-          ...state.graph,
-          nodes: newNodes,
-          connections: newConnections,
-          nodeOrder: newNodeOrder,
-        },
-      };
-    }),
-
-  updateNodeParameter: (nodeId, paramId, value) =>
-    set((state) => {
-      const newNodes = new Map(state.graph.nodes);
-      const node = newNodes.get(nodeId);
-      if (node) {
-        const param = node.parameters.find((p) => p.id === paramId);
-        if (param) {
-          param.value = value;
-          newNodes.set(nodeId, { ...node }); // Create new object to trigger re-render
+    _resizeRoutingMatrix: (newNodeCount, oldNodeCount, oldMatrix) => {
+      const currentGraphState = get();
+      const newMatrix = currentGraphState._initializeRoutingMatrix(newNodeCount, currentGraphState.outputChannels);
+      const copyCount = Math.min(newNodeCount, oldNodeCount);
+      for (let ch = 0; ch < currentGraphState.outputChannels; ch++) {
+        for (let r = 0; r < copyCount; r++) {
+          for (let c = 0; c < copyCount; c++) {
+            newMatrix[ch][r][c] = oldMatrix[ch]?.[r]?.[c] ?? 0;
+          }
         }
       }
-      return { graph: { ...state.graph, nodes: newNodes } };
-    }),
+      return newMatrix;
+    },
 
-  setMatrixConnection: (fromNodeId, fromChannel, toNodeId, toChannel, weight) =>
-    set((state) => {
-      const newConnections = [
-        ...state.graph.connections.filter(
-          (conn) =>
-            !(
-              conn.from.nodeId === fromNodeId &&
-              conn.from.channel === fromChannel &&
-              conn.to.nodeId === toNodeId &&
-              conn.to.channel === toChannel
-            ),
-        ),
-      ];
-      if (weight > 0) { // Only add connection if weight is positive
-        newConnections.push({
-          from: { nodeId: fromNodeId, channel: fromChannel },
-          to: { nodeId: toNodeId, channel: toChannel },
-          weight,
-        });
+    getNodeById: (nodeId) => get().nodes.find((node: AudioNodeInstance) => node.id === nodeId),
+
+    getNodeIndex: (nodeId) => get().nodes.findIndex((node: AudioNodeInstance) => node.id === nodeId),
+
+    addNode: (type, id, uiPosition) => {
+      const newNodeId: NodeId = id ?? nanoid(10);
+      const nodeParamsDefinition = NODE_PARAMETER_DEFINITIONS[type];
+
+      const defaultParameters: Record<ParameterId, ParameterValue> = {};
+      for (const paramId in nodeParamsDefinition) {
+        if (Object.prototype.hasOwnProperty.call(nodeParamsDefinition, paramId)) {
+            defaultParameters[paramId] = nodeParamsDefinition[paramId].defaultValue;
+        }
       }
-      return { graph: { ...state.graph, connections: newConnections } };
-    }),
 
-  getSerializedGraph: (): SerializedAudioGraph => {
-    const { nodes, connections, nodeOrder, outputNodeId, inputNodeId } = get().graph;
-    const serializedNodes = Array.from(nodes.values()).map(node => ({
-      id: node.id,
-      kernel: node.kernel,
-      parameters: node.parameters.map(p => ({ ...p })), // Deep copy parameters
-      position: node.position || { x: 0, y: 0 } // Ensure position exists
-    }));
-    return {
-      nodes: serializedNodes,
-      connections: JSON.parse(JSON.stringify(connections)), // Deep copy
-      nodeOrder,
-      outputNodeId,
-      inputNodeId,
-    };
-  },
+      const newNodeInstance: AudioNodeInstance = {
+        id: newNodeId,
+        type,
+        parameters: defaultParameters,
+        label: type,
+        uiPosition: uiPosition ?? { x: Math.random() * 300, y: Math.random() * 200 },
+      };
 
-  loadGraph: (serializedGraph) => set(() => {
-    const nodes = new Map<NodeId, AudioNode>();
-    serializedGraph.nodes.forEach(sn => {
-      nodes.set(sn.id, {
-        id: sn.id,
-        kernel: sn.kernel,
-        parameters: sn.parameters.map(p => ({...p})),
-        position: sn.position
+      set((state: GraphState) => {
+        state.nodes.push(newNodeInstance);
+        const oldNodeCount = state.nodes.length - 1;
+        state.routingMatrix = state._resizeRoutingMatrix(state.nodes.length, oldNodeCount, state.routingMatrix);
       });
-    });
-    return {
-      graph: {
-        nodes,
-        connections: JSON.parse(JSON.stringify(serializedGraph.connections)),
-        nodeOrder: [...serializedGraph.nodeOrder],
-        outputNodeId: serializedGraph.outputNodeId,
-        inputNodeId: serializedGraph.inputNodeId,
-      }
-    };
-  }),
-}));
+      return newNodeId;
+    },
 
-// Function to inform the AudioWorklet about graph changes
-// This will be expanded in bridge.ts
-export const sendGraphToProcessor = (
-  processorPort: MessagePort | null,
-  graph: SerializedAudioGraph,
-) => {
-  if (processorPort) {
-    const message: ProcessorMessage = {
-      type: MessageType.GRAPH_UPDATE,
-      payload: graph,
-    };
-    processorPort.postMessage(message);
-  }
-};
+    removeNode: (nodeId) => {
+      set((state: GraphState) => {
+        const nodeIndexToRemove = state.getNodeIndex(nodeId);
+        if (nodeIndexToRemove === -1) {
+          console.warn(`Node with ID ${nodeId} not found for removal.`);
+          return;
+        }
 
-// Function to inform the AudioWorklet about parameter changes
-export const sendParameterUpdateToProcessor = (
-  processorPort: MessagePort | null,
-  nodeId: NodeId,
-  paramId: ParameterId,
-  value: number,
-) => {
-  if (processorPort) {
-    const message: ProcessorMessage = {
-      type: MessageType.PARAM_UPDATE,
-      payload: { nodeId, paramId, value },
-    };
-    processorPort.postMessage(message);
-  }
-};
+        const oldNodes = [...state.nodes];
+        state.nodes.splice(nodeIndexToRemove, 1);
 
-// Example of subscribing to graph changes to send updates to the processor
-// This logic will likely live in a dedicated bridge or hook
-// useGraphStore.subscribe(
-//   (state) => state.graph,
-//   (graph, previousGraph) => {
-//     // Basic check, needs to be more sophisticated to avoid unnecessary updates
-//     if (JSON.stringify(graph) !== JSON.stringify(previousGraph)) {
-//       console.log('Graph changed, sending to processor');
-//       // Assuming processorPort is accessible here or passed in
-//       // sendGraphToProcessor(processorPort, get().getSerializedGraph());
-//     }
-//   }
-// );
+        const oldNodeCount = oldNodes.length;
+        const newNodeCount = state.nodes.length;
+        const oldMatrix = state.routingMatrix;
+        const newMatrix = state._initializeRoutingMatrix(newNodeCount, state.outputChannels);
+
+        for (let ch = 0; ch < state.outputChannels; ch++) {
+          let newR = 0;
+          for (let r = 0; r < oldNodeCount; r++) {
+            if (r === nodeIndexToRemove) continue;
+            let newC = 0;
+            for (let c = 0; c < oldNodeCount; c++) {
+              if (c === nodeIndexToRemove) continue;
+              newMatrix[ch][newR][newC] = oldMatrix[ch]?.[r]?.[c] ?? 0;
+              newC++;
+            }
+            newR++;
+          }
+        }
+        state.routingMatrix = newMatrix;
+      });
+    },
+
+    updateNodeParameter: (nodeId, parameterId, value) => {
+      set((state: GraphState) => {
+        const node = state.nodes.find((n: AudioNodeInstance) => n.id === nodeId);
+        if (node) {
+          if (Object.prototype.hasOwnProperty.call(node.parameters, parameterId)) {
+            node.parameters[parameterId] = value;
+          } else {
+            console.warn(
+              `Parameter ${parameterId} not found on node ${nodeId}. Available:`,
+              Object.keys(node.parameters),
+            );
+          }
+        } else {
+          console.warn(`Node ${nodeId} not found for parameter update.`);
+        }
+      });
+    },
+
+    setMatrixValue: (channel, sourceNodeId, destNodeId, weight) => {
+      set((state: GraphState) => {
+        const sourceIndex = state.getNodeIndex(sourceNodeId);
+        const destIndex = state.getNodeIndex(destNodeId);
+        if (sourceIndex !== -1 && destIndex !== -1 && channel >= 0 && channel < state.outputChannels) {
+            // Direct assignment is safe if indices are validated and matrix is initialized correctly.
+            state.routingMatrix[channel][sourceIndex][destIndex] = Math.max(0, Math.min(1, weight));
+        } else {
+          console.warn(`Invalid matrix indices/node IDs for setMatrixValue. Chan:${channel}, Src:${sourceNodeId}(${sourceIndex}), Dest:${destNodeId}(${destIndex})`);
+        }
+      });
+    },
+
+    setConnectionWeightById: (fromNodeId, toNodeId, channelIndex, weight) => {
+        const graph = get();
+        const fromIndex = graph.getNodeIndex(fromNodeId);
+        const toIndex = graph.getNodeIndex(toNodeId);
+
+        if (fromIndex === -1 || toIndex === -1) {
+          console.warn("setConnectionWeightById: Invalid nodeId", {fromNodeId, toNodeId, fromIndex, toIndex});
+          return;
+        }
+        if (channelIndex < 0 || channelIndex >= graph.outputChannels) {
+            console.warn("setConnectionWeightById: Invalid channelIndex", {channelIndex, outputChannels: graph.outputChannels });
+            return;
+        }
+
+        set((state: GraphState) => {
+            // Direct assignment after checks
+            state.routingMatrix[channelIndex][fromIndex][toIndex] = Math.max(0, Math.min(1, weight));
+        });
+    },
+
+    getSerializedGraph: (): SerializedAudioGraph => {
+      const state = get();
+      const connections: SerializedAudioGraph['connections'] = [];
+      state.routingMatrix.forEach((channelMatrix, channelIndex: number) => {
+        channelMatrix.forEach((sourceRow, sourceNodeIndex: number) => {
+          sourceRow.forEach((weightVal, destNodeIndex: number) => {
+            if (weightVal > 0) {
+              const sourceNode = state.nodes[sourceNodeIndex];
+              const destNode = state.nodes[destNodeIndex];
+              connections.push({
+                from: sourceNode.id,
+                to: destNode.id,
+                weight: weightVal,
+                channel: channelIndex,
+              });
+            }
+          });
+        });
+      });
+      return {
+        nodes: JSON.parse(JSON.stringify(state.nodes)) as AudioNodeInstance[],
+        connections,
+        outputChannels: state.outputChannels,
+        masterGain: state.masterGain,
+        nodeOrder: state.nodes.map((n: AudioNodeInstance) => n.id),
+      };
+    },
+
+    loadGraph: (serializedGraph) => {
+      set((state: GraphState) => {
+        state.nodes = [];
+        state.outputChannels = serializedGraph.outputChannels;
+        state.masterGain = serializedGraph.masterGain;
+
+        const nodeOrder = serializedGraph.nodeOrder ?? serializedGraph.nodes.map((n: AudioNodeInstance) => n.id);
+        const tempNodeMap = new Map<NodeId, AudioNodeInstance>(
+            serializedGraph.nodes.map((n: AudioNodeInstance) => [n.id, n])
+        );
+
+        const loadedNodes: AudioNodeInstance[] = [];
+        nodeOrder.forEach(nodeId => {
+            const nodeData = tempNodeMap.get(nodeId);
+            if (nodeData) {
+                const nodeParamsDefinition = NODE_PARAMETER_DEFINITIONS[nodeData.type];
+                const defaultParameters: Record<ParameterId, ParameterValue> = {};
+                for (const paramId in nodeParamsDefinition) {
+                    if (Object.prototype.hasOwnProperty.call(nodeParamsDefinition, paramId)) {
+                        defaultParameters[paramId] = nodeParamsDefinition[paramId].defaultValue;
+                    }
+                }
+                const newNodeInstance: AudioNodeInstance = {
+                    id: nodeData.id,
+                    type: nodeData.type,
+                    parameters: { ...defaultParameters, ...nodeData.parameters },
+                    label: nodeData.label ?? nodeData.type,
+                    uiPosition: nodeData.uiPosition ?? { x: Math.random() * 300, y: Math.random() * 200 },
+                };
+                loadedNodes.push(newNodeInstance);
+            }
+        });
+        state.nodes = loadedNodes;
+        state.routingMatrix = state._initializeRoutingMatrix(state.nodes.length, state.outputChannels);
+
+        serializedGraph.connections.forEach(conn => {
+          const fromIndex = state.getNodeIndex(conn.from);
+          const toIndex = state.getNodeIndex(conn.to);
+          const graphChannel = conn.channel;
+
+          if (fromIndex !== -1 && toIndex !== -1 && graphChannel >= 0 && graphChannel < state.outputChannels) {
+              // Direct assignment after checks
+              state.routingMatrix[graphChannel][fromIndex][toIndex] = conn.weight;
+          } else {
+            console.warn("loadGraph: Invalid connection data or indices out of bounds", conn, {fromIndex, toIndex, graphChannel, outputChannels: state.outputChannels});
+          }
+        });
+      });
+    },
+  })),
+);

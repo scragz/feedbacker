@@ -1,4 +1,5 @@
-import { createTheme, MantineColorsTuple } from '@mantine/core';
+import { createTheme } from '@mantine/core';
+import type { MantineColorsTuple } from '@mantine/core';
 
 // Example custom colors - replace with your actual cyan and orange
 const mfnCyan: MantineColorsTuple = [
@@ -28,14 +29,16 @@ const mfnOrange: MantineColorsTuple = [
 ];
 
 export const theme = createTheme({
-  /** Put your mantine theme override here */
-  primaryColor: 'mfnCyan', // Will be one of the keys in colors
-  defaultColorScheme: 'dark',
+  fontFamily: "'IBM Plex Mono', monospace",
+  primaryColor: 'mfnCyan',
   colors: {
     mfnCyan,
     mfnOrange,
   },
-  // Other theme properties
-  // fontFamily: 'Verdana, sans-serif',
-  // headings: { fontFamily: 'Greycliff CF, sans-serif' },
+  headings: {
+    fontFamily: "Frijole, sans-serif",
+    sizes: {
+      h1: { fontSize: '36' },
+    },
+  }
 });
