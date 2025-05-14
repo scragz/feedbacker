@@ -1,14 +1,17 @@
-import { ActionIcon, Button, Group, Slider, Text } from '@mantine/core';
-import { IconPlayerPlay, IconPlayerStop, IconPlayerRecord, IconMoodCrazyHappy } from '@tabler/icons-react';
+import { ActionIcon, Button, Group, Slider, Text, Switch, Tooltip } from '@mantine/core';
+import { IconPlayerPlay, IconPlayerStop, IconPlayerRecord, IconMoodCrazyHappy, IconVolume, IconVolumeOff, IconSettings } from '@tabler/icons-react';
 import classes from './TransportBar.module.css';
 
 interface TransportBarProps {
   audioContextState: AudioContextState | null;
   onPlayPause: () => void;
-  onRecord: () => void; // Placeholder for now
+  onRecord: () => void;
   chaosValue: number;
-  onChaosChange: (value: number) => void; // Placeholder for now
-  isRecording?: boolean; // Optional: to change record button appearance
+  onChaosChange: (value: number) => void;
+  isMono: boolean;
+  onMonoToggle: (value: boolean) => void;
+  isRecording?: boolean;
+  onOpenModulationSettings?: () => void;
 }
 
 export function TransportBar({
@@ -17,7 +20,10 @@ export function TransportBar({
   onRecord,
   chaosValue,
   onChaosChange,
+  isMono,
+  onMonoToggle,
   isRecording = false,
+  onOpenModulationSettings,
 }: TransportBarProps) {
   const isPlaying = audioContextState === 'running';
 
@@ -36,18 +42,51 @@ export function TransportBar({
           Record
         </Button>
       </Group>
-      <Group className={classes.chaosControl}>
-        <IconMoodCrazyHappy size={24} />
-        <Text size="sm">Chaos:</Text>
-        <Slider
-          value={chaosValue}
-          onChange={onChaosChange}
-          min={0}
-          max={100}
-          step={1}
-          style={{ width: 150 }}
-          label={(value) => `${value}%`}
-        />
+
+      <Group>
+        <Group className={classes.monoControl}>
+          <IconVolumeOff size={18} />
+          <Switch
+            checked={!isMono}
+            onChange={(event) => onMonoToggle(!event.currentTarget.checked)}
+            label={isMono ? "Mono" : "Stereo"}
+            labelPosition="right"
+          />
+          <IconVolume size={18} />
+        </Group>
+
+        {onOpenModulationSettings && (
+          <ActionIcon
+            onClick={onOpenModulationSettings}
+            title="Modulation Settings"
+            variant="light"
+            size="lg"
+          >
+            <IconSettings size={20} />
+          </ActionIcon>
+        )}
+
+        <Group className={classes.chaosControl}>
+          <Tooltip label="Adjust chaos level - higher values create more extreme modulation">
+            <IconMoodCrazyHappy size={24} />
+          </Tooltip>
+          <Text size="sm">Chaos:</Text>
+          <Slider
+            value={chaosValue}
+            onChange={onChaosChange}
+            min={0}
+            max={100}
+            step={1}
+            style={{ width: 150 }}
+            label={(value) => { return `${value}%`; }}
+            marks={[
+              { value: 0, label: '0' },
+              { value: 50, label: '50' },
+              { value: 100, label: '100' }
+            ]}
+            color={chaosValue > 50 ? chaosValue > 75 ? 'red' : 'orange' : 'blue'}
+          />
+        </Group>
       </Group>
     </Group>
   );

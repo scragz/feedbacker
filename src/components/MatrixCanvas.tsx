@@ -19,8 +19,8 @@ interface MatrixCanvasProps {
 }
 
 const MatrixCanvas: React.FC<MatrixCanvasProps> = ({
-  width = 600,
-  height = 400,
+  width = 720,
+  height = 480,
   audioGraph,
   onMatrixCellClick,
 }) => {

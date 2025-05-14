@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { nanoid } from 'nanoid';
-import { MantineProvider, Stack, LoadingOverlay, ScrollArea } from '@mantine/core';
+import { MantineProvider, Stack, LoadingOverlay, ScrollArea, Modal } from '@mantine/core';
 import { theme } from './theme';
 import Controls from './components/Controls';
 import NodeList from './components/NodeList';
@@ -10,6 +10,7 @@ import Pedalboard from './components/Pedalboard';
 import LayoutShell from './components/LayoutShell';
 import TransportBar from './components/TransportBar';
 import MatrixCanvas from './components/MatrixCanvas';
+import { ModulationPanel } from './components/ModulationPanel';
 
 import { useAudioInitialization } from './hooks/useAudioInitialization';
 import { useProcessorInitialization } from './hooks/useProcessorInitialization';
@@ -70,6 +71,38 @@ const initialGraph: AudioGraph = {
   routingMatrix: initializeRoutingMatrix(1, initialOutputChannels),
   outputChannels: initialOutputChannels,
   masterGain: initialMasterGain,
+  isMono: true, // Default to mono mode
+  chaosLevel: 0, // Default chaos level
+
+  // Default LFO settings
+  lfo1: {
+    enabled: false,
+    frequency: 1.0, // 1 Hz
+    waveform: 'sine',
+    amount: 0.5,
+  },
+  lfo2: {
+    enabled: false,
+    frequency: 0.5, // 0.5 Hz
+    waveform: 'triangle',
+    amount: 0.5,
+  },
+
+  // Default envelope follower settings
+  envelopeFollower1: {
+    enabled: false,
+    attack: 0.01, // 10ms
+    release: 0.1, // 100ms
+    amount: 0.5,
+    source: null,
+  },
+  envelopeFollower2: {
+    enabled: false,
+    attack: 0.05, // 50ms
+    release: 0.5, // 500ms
+    amount: 0.5,
+    source: null,
+  },
 };
 
 function App() {
@@ -79,8 +112,13 @@ function App() {
   const [audioError, setAudioError] = useState<string | null>(null);
   const [processorReady, setProcessorReady] = useState<boolean>(false);
   const [audioContextState, setAudioContextState] = useState<AudioContextState | null>(null);
-  const [globalParameters, setGlobalParameters] = useState<Record<string, number>>({ chaos: 0 });
+  const [globalParameters, setGlobalParameters] = useState<Record<string, number>>({
+    chaos: 0,
+    masterGain: initialMasterGain
+  });
   const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [isMono, setIsMono] = useState<boolean>(true); // Default to mono mode
+  const [showModulationSettings, setShowModulationSettings] = useState<boolean>(false);
 
   const {
     audioContextRef, // Corrected: was audioContext
@@ -202,29 +240,86 @@ function App() {
     workletNodeRef.current.port.postMessage(message);
   }, [workletNodeRef, audioInitialized, processorReady, setAudioError]); // Removed setAudioGraph & setSelectedNodeId from deps
 
-  const handleParameterChange = useCallback((nodeId: NodeId, parameterId: ParameterId, value: ParameterValue) => {
-    if (!workletNodeRef.current || !audioInitialized || !processorReady) {
-      setAudioError('Audio system not ready. Cannot change parameter.');
-      return;
-    }
-    // Optimistically update local state for responsiveness for parameter changes.
-    // The worklet will also send PARAMETER_UPDATED, which useAudioInitialization handles,
-    // potentially causing a re-set, but this is usually fine for params.
-    setAudioGraph(prevGraph => ({
-      ...prevGraph,
-      nodes: prevGraph.nodes.map(n =>
-        n.id === nodeId
-          ? { ...n, parameters: { ...n.parameters, [parameterId]: value } }
-          : n
-      ),
-    }));
+  const handleParameterChange = useCallback(
+    (nodeId: NodeId, parameterId: ParameterId, value: ParameterValue) => {
+      if (!workletNodeRef.current || !audioInitialized || !processorReady) {
+        setAudioError('Audio system not ready. Cannot change parameter.');
+        return;
+      }
+      // Optimistically update local state for responsiveness for parameter changes.
+      // The worklet will also send PARAMETER_UPDATED, which useAudioInitialization handles,
+      // potentially causing a re-set, but this is usually fine for params.
+      setAudioGraph(prevGraph => ({
+        ...prevGraph,
+        nodes: prevGraph.nodes.map(n =>
+          n.id === nodeId
+            ? { ...n, parameters: { ...n.parameters, [parameterId]: value } }
+            : n
+        ),
+      }));
 
-    const message: MainThreadMessage = {
-      type: MainThreadMessageType.UPDATE_PARAMETER,
-      payload: { nodeId, parameterId, value },
-    };
-    workletNodeRef.current.port.postMessage(message);
-  }, [workletNodeRef, audioInitialized, processorReady, setAudioGraph, setAudioError]);
+      const message: MainThreadMessage = {
+        type: MainThreadMessageType.UPDATE_PARAMETER,
+        payload: { nodeId, parameterId, value },
+      };
+      workletNodeRef.current.port.postMessage(message);
+    },
+    [workletNodeRef, processorReady, audioInitialized, setAudioGraph]
+  );
+
+  const handleModulationChange = useCallback(
+    (
+      nodeId: NodeId,
+      parameterId: string,
+      source: 'lfo1' | 'lfo2' | 'env1' | 'env2',
+      enabled: boolean,
+      amount = 0.5
+    ) => {
+      if (!workletNodeRef.current || !audioInitialized || !processorReady) {
+        setAudioError('Audio system not ready. Cannot update modulation.');
+        return;
+      }
+
+      setAudioGraph(prevGraph => {
+        const updatedGraph = { ...prevGraph };
+        const nodeIndex = updatedGraph.nodes.findIndex(n => n.id === nodeId);
+
+        if (nodeIndex === -1) {
+          console.error(`[App.tsx] Node with ID ${nodeId} not found for modulation update.`);
+          return prevGraph;
+        }
+
+        // Initialize modulation object if it doesn't exist
+        const node = { ...updatedGraph.nodes[nodeIndex] };
+        node.modulation = node.modulation ?? {};
+
+        // Initialize parameter modulation if it doesn't exist
+        node.modulation[parameterId] = node.modulation[parameterId] ?? {};
+
+        // Update the specific modulation source
+        node.modulation[parameterId][source] = {
+          enabled,
+          amount
+        };
+
+        // Update the node in the graph
+        updatedGraph.nodes[nodeIndex] = node;
+
+        // Send the updated graph to the worklet
+        if (workletNodeRef.current) {
+          const message: UpdateGraphMessage = {
+            type: MainThreadMessageType.UPDATE_GRAPH,
+            payload: { graph: updatedGraph },
+          };
+          workletNodeRef.current.port.postMessage(message);
+          console.log(`[App.tsx] Sent UPDATE_GRAPH message after modulation change for ${nodeId}.${parameterId} (${source}): ${enabled ? 'enabled' : 'disabled'}, amount: ${amount}`);
+        }
+
+        return updatedGraph;
+      });
+    },
+    [workletNodeRef, audioInitialized, processorReady, setAudioGraph]
+  );
 
   const handleGlobalParameterChange = useCallback((parameterId: string, value: number) => {
     if (!workletNodeRef.current || !audioInitialized || !processorReady) {
@@ -321,6 +416,79 @@ function App() {
     [workletNodeRef, audioInitialized, processorReady, setAudioGraph]
   );
 
+  const handleMonoToggle = (value: boolean) => {
+    setIsMono(value);
+
+    // Update the audio graph with new mono setting
+    setAudioGraph(prevGraph => {
+      const updatedGraph = {
+        ...prevGraph,
+        isMono: value
+      };
+
+      // Only send the update if the processor is ready
+      if (workletNodeRef.current && processorReady) {
+        const message: UpdateGraphMessage = {
+          type: MainThreadMessageType.UPDATE_GRAPH,
+          payload: { graph: updatedGraph },
+        };
+        workletNodeRef.current.port.postMessage(message);
+        console.log('[App.tsx] Sent UPDATE_GRAPH message after mono toggle:', updatedGraph);
+      }
+
+      return updatedGraph;
+    });
+  };
+
+  const handleLFOParameterChange = (lfoNumber: 1 | 2, paramName: string, value: number | string | boolean) => {
+    if (!workletNodeRef.current || !audioInitialized || !processorReady) {
+      setAudioError('Audio system not ready. Cannot update LFO settings.');
+      return;
+    }
+
+    setAudioGraph(prevGraph => {
+      const lfoKey = `lfo${lfoNumber}` as 'lfo1' | 'lfo2';
+      const currentLfo = prevGraph[lfoKey] || {
+        enabled: false,
+        frequency: lfoNumber === 1 ? 1.0 : 0.5,
+        waveform: lfoNumber === 1 ? 'sine' : 'triangle',
+        amount: 0.5
+      };
+
+      // Create updated LFO settings with the new parameter value
+      const updatedLfo = {
+        ...currentLfo,
+        [paramName]: value
+      };
+
+      // Create updated graph with new LFO settings
+      const updatedGraph = {
+        ...prevGraph,
+        [lfoKey]: updatedLfo
+      };
+
+      // Send the updated graph to the worklet
+      if (workletNodeRef.current) {
+        const message: UpdateGraphMessage = {
+          type: MainThreadMessageType.UPDATE_GRAPH,
+          payload: { graph: updatedGraph },
+        };
+        workletNodeRef.current.port.postMessage(message);
+        console.log(`[App.tsx] Sent UPDATE_GRAPH message after LFO${lfoNumber} parameter change: ${paramName} = ${value}`);
+      }
+
+      return updatedGraph;
+    });
+  };
+
+  const handleOpenModulationSettings = () => {
+    setShowModulationSettings(true);
+  };
+
+  const handleCloseModulationSettings = () => {
+    setShowModulationSettings(false);
+  };
+
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
       <LayoutShell>
@@ -332,6 +500,9 @@ function App() {
             onRecord={handleRecord}
             chaosValue={globalParameters.chaos * 100} // Assuming chaos is 0-1 in state, UI wants 0-100
             onChaosChange={handleChaosChange}
+            isMono={isMono}
+            onMonoToggle={handleMonoToggle}
+            onOpenModulationSettings={handleOpenModulationSettings}
           />
           <Stack>
             <Controls
@@ -350,20 +521,16 @@ function App() {
             key={selectedNodeInstance?.id} // Ensure re-render on node change
             selectedNode={selectedNodeInstance}
             onParameterChange={handleParameterChange}
+            onModulationChange={handleModulationChange}
           />
           <ScrollArea style={{ height: '100%', width: '100%' }}>
-            <MatrixCanvas
-              audioGraph={audioGraph}
-              onMatrixCellClick={handleMatrixCellClick}
-            />
+            <Stack justify="center">
+              <MatrixCanvas
+                audioGraph={audioGraph}
+                onMatrixCellClick={handleMatrixCellClick}
+              />
+            </Stack>
           </ScrollArea>
-          <StatusDisplay
-            audioError={audioError}
-            audioInitialized={audioInitialized}
-            audioContextState={audioContextRef.current?.state ?? null}
-            processorReady={processorReady}
-            initMessageSent={initMessageSent}
-          />
         </Pedalboard>
       </LayoutShell>
       <LoadingOverlay
@@ -371,6 +538,30 @@ function App() {
         overlayProps={{ radius: 'sm', blur: 2 }}
         loaderProps={{ children: 'Initializing Audio Engine...' }}
       />
+      <Modal
+        opened={showModulationSettings}
+        onClose={handleCloseModulationSettings}
+        title="Global Modulation Settings"
+        size="xl"
+      >
+        <ModulationPanel
+          lfo1={audioGraph.lfo1 ?? {
+            enabled: false,
+            frequency: 1.0,
+            waveform: 'sine',
+            amount: 0.5,
+          }}
+          lfo2={audioGraph.lfo2 ?? {
+            enabled: false,
+            frequency: 0.5,
+            waveform: 'triangle',
+            amount: 0.5,
+          }}
+          chaosValue={globalParameters.chaos * 100}
+          onLFOChange={handleLFOParameterChange}
+          onChaosChange={handleChaosChange}
+        />
+      </Modal>
     </MantineProvider>
   );
 }

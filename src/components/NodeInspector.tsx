@@ -6,41 +6,36 @@ import {
   NODE_PARAMETER_DEFINITIONS,
   type ParameterDefinition,
 } from '../audio/schema';
+import { ModulationButtonGroup } from './ModulationButton';
 import classes from './NodeInspector.module.css';
 
 interface NodeInspectorProps {
   selectedNode: AudioNodeInstance | null;
   onParameterChange: (nodeId: string, parameterId: ParameterId, value: ParameterValue) => void;
+  onModulationChange?: (
+    nodeId: string,
+    parameterId: string,
+    source: 'lfo1' | 'lfo2' | 'env1' | 'env2',
+    enabled: boolean,
+    amount?: number
+  ) => void;
 }
 
 export function NodeInspector({
   selectedNode,
   onParameterChange,
+  onModulationChange,
 }: NodeInspectorProps) {
   if (!selectedNode) {
-    return (
-      <Box className={classes.inspectorPlaceholder}>
-        <Text>Select a node to inspect its parameters.</Text>
-      </Box>
-    );
+    return <></>;
   }
 
   const nodeDefinition = NODE_PARAMETER_DEFINITIONS[selectedNode.type];
-  if (!nodeDefinition) {
-    return (
-      <Box className={classes.inspectorContainer} p="md">
-        <Title order={4} mb="md">
-          Error
-        </Title>
-        <Text c="red">Unknown node type: {selectedNode.type}</Text>
-      </Box>
-    );
-  }
 
   return (
     <Box className={classes.inspectorContainer} p="md">
       <Title order={4} mb="md">
-        {selectedNode.label ?? selectedNode.type} Inspector
+        {selectedNode.label ?? selectedNode.type}
       </Title>
       <Stack>
         {Object.entries(selectedNode.parameters).map(([paramId, currentValue]) => {
@@ -82,6 +77,14 @@ export function NodeInspector({
                   min={paramDef.minValue}
                   max={paramDef.maxValue}
                   step={paramDef.step ?? (paramDef.type === 'integer' ? 1 : 0.01)}
+                  scale={paramDef.scale === 'logarithmic' && paramDef.minValue && paramDef.maxValue && paramDef.minValue > 0 ?
+                    (val) => {
+                      // Safely calculate logarithmic scale
+                      const min = paramDef.minValue ?? 0.001; // Safety minimum
+                      const max = paramDef.maxValue ?? 1;
+                      return Math.log10(val / min) / Math.log10(max / min) * 100;
+                    } :
+                    undefined}
                   label={(value) => {
                     if (typeof value === 'number') {
                       const precision = paramDef.type === 'integer' ? 0 :
@@ -99,6 +102,15 @@ export function NodeInspector({
                 <Text size="xs" c="dimmed" mt={2}>
                   Unsupported parameter type: {paramDef.type}
                 </Text>
+              )}
+              {(paramDef.type === 'float' || paramDef.type === 'integer') && onModulationChange && (
+                <ModulationButtonGroup
+                  parameter={paramId}
+                  modulation={selectedNode.modulation?.[paramId]}
+                  onModulationChange={(paramId, source, enabled, amount) => {
+                    onModulationChange(selectedNode.id, paramId, source, enabled, amount);
+                  }}
+                />
               )}
               <Text size="xs" c="dimmed" mt={2}>
                 {paramDef.label} {paramDef.type !== 'enum' && paramDef.unit ? `(${paramDef.unit})` : ''}

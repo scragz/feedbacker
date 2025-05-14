@@ -6,11 +6,20 @@ import { processGain } from './gain';
 import { processDelay } from './delay';
 import { processBiquad } from './biquad';
 import { passthroughKernel } from './passthrough';
-import { oscillatorKernel } from './oscillator'; // ADDED
+import { oscillatorKernel } from './oscillator';
+import { waveshaperKernel } from './waveshaper'; // ADDED
 import type { DSPKernel } from './dsp-kernel';
 
 // Export individual kernels if needed elsewhere
-export { processGain, processDelay, processBiquad, noiseKernel, passthroughKernel, oscillatorKernel }; // MODIFIED
+export {
+  processGain,
+  processDelay,
+  processBiquad,
+  noiseKernel,
+  passthroughKernel,
+  oscillatorKernel,
+  waveshaperKernel // ADDED
+};
 
 // Create and export the kernel registry
 // export const kernelRegistry: Record<NodeType, DSPKernel> = {

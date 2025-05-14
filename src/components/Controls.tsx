@@ -25,6 +25,13 @@ const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAud
   const addOscillatorNode = () => {
     onAddNode('oscillator');
   };
+  const addWaveshaperNode = () => {
+    onAddNode('waveshaper');
+  };
+  function addMicrophoneNode(): void {
+    throw new Error('Function not implemented.');
+  }
+
   // const addMicrophoneNode = () => { // ADDED - Placeholder for microphone
   //   onAddNode('microphone');
   // };
@@ -35,25 +42,28 @@ const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAud
           Resume Audio Context
         </Button>
       )}
-      <Group className={classes.buttonGroup} grow>
+      <Group className={classes.buttonGroup} grow wrap="wrap">
         <Button onClick={addGainNode} variant="light">
-          Add Gain
+          Gain
         </Button>
         <Button onClick={addDelayNode} variant="light">
-          Add Delay
+          Delay
         </Button>
         <Button onClick={addBiquadNode} variant="light">
-          Add Biquad
+          Biquad
         </Button>
         <Button onClick={addNoiseNode} variant="light">
-          Add Noise
+          Noise
         </Button>
-        <Button onClick={addOscillatorNode} variant="light"> {/* ADDED */}
-          Add Oscillator
+        <Button onClick={addOscillatorNode} variant="light">
+          Osc
         </Button>
-        {/* <Button onClick={addMicrophoneNode} variant="light" disabled> ADDED - Placeholder
-          Add Microphone (WIP)
-        </Button> */}
+        <Button onClick={addWaveshaperNode} variant="light">
+          Waveshaper
+        </Button>
+        <Button onClick={addMicrophoneNode} variant="light" disabled>
+          Mic
+        </Button>
       </Group>
     </div>
   );

@@ -70,14 +70,21 @@ export type NodeType =
   | 'gain'
   | 'delay'
   | 'biquad'
-  | 'oscillator' // MODIFIED: Ensured oscillator is part of the type
+  | 'oscillator'
   | 'noise'
+  | 'waveshaper' // ADDED: Waveshaper node type
   | 'input_mixer' // Special node for graph input
   | 'output_mixer' // Special node for graph output
-  | 'microphone'; // ADDED: Microphone node type
+  | 'microphone'; // Microphone node type
 
 // ADDED: Specific type for oscillator waveforms
 export type OscillatorWaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
+
+// ADDED: Specific type for waveshaper curve types
+export type WaveshaperCurveType = 'soft' | 'hard' | 'sin' | 'tanh' | 'atan' | 'clip' | 'fold';
+
+// ADDED: Specific type for LFO waveforms
+export type LFOWaveformType = 'sine' | 'square' | 'triangle' | 'sawtooth' | 'random';
 
 /**
  * Generic structure for defining a parameter of an audio node.
@@ -93,6 +100,7 @@ export interface ParameterDefinition<T = number> {
   enumValues?: string[]; // For 'enum' type
   unit?: string; // e.g., 'Hz', 'dB', 's'
   step?: number; // ADDED: Step value for numerical parameters
+  scale?: 'linear' | 'logarithmic'; // ADDED: Scale type for numeric parameters
 }
 
 // Helper type for parameter values
@@ -120,6 +128,14 @@ export interface AudioNodeInstance {
   channelCount?: number; // ADDED: Number of channels for this node instance
   // Position for UI, not used by worklet directly but useful for graph state
   uiPosition?: { x: number; y: number };
+
+  // ADDED: Parameter modulation settings
+  modulation?: Record<string, {
+    lfo1?: { amount: number; enabled: boolean; };
+    lfo2?: { amount: number; enabled: boolean; };
+    env1?: { amount: number; enabled: boolean; };
+    env2?: { amount: number; enabled: boolean; };
+  }>;
 }
 
 // === Routing Matrix ===
@@ -147,6 +163,36 @@ export interface AudioGraph {
   masterGain: number; // Overall master gain, ensure this is used instead of 'masterVolume'
   isMono?: boolean; // ADDED: Flag for mono processing mode
   chaosLevel?: number; // ADDED: Global chaos level (e.g., 0 to 1)
+
+  // ADDED: Global LFOs
+  lfo1?: {
+    enabled: boolean;
+    frequency: number;
+    waveform: LFOWaveformType;
+    amount: number;
+  };
+  lfo2?: {
+    enabled: boolean;
+    frequency: number;
+    waveform: LFOWaveformType;
+    amount: number;
+  };
+
+  // ADDED: Envelope followers
+  envelopeFollower1?: {
+    enabled: boolean;
+    attack: number;
+    release: number;
+    amount: number;
+    source: NodeId | null; // Which node's output to follow
+  };
+  envelopeFollower2?: {
+    enabled: boolean;
+    attack: number;
+    release: number;
+    amount: number;
+    source: NodeId | null; // Which node's output to follow
+  };
 }
 
 // === Message Payloads ===
@@ -329,19 +375,47 @@ export const NODE_PARAMETER_DEFINITIONS: NodeParameterDefinitions = {
     feedback: { id: 'feedback', label: 'Feedback', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '', step: 0.01 },
   },
   biquad: {
-    frequency: { id: 'frequency', label: 'Frequency', type: 'float', defaultValue: 1000, minValue: 20, maxValue: 20000, unit: 'Hz', step: 1 },
+    frequency: {
+      id: 'frequency',
+      label: 'Frequency',
+      type: 'float',
+      defaultValue: 1000,
+      minValue: 0.5, // Lowered from 20Hz to 0.5Hz
+      maxValue: 20000,
+      unit: 'Hz',
+      step: 0.1,
+      scale: 'logarithmic' // Added logarithmic scale
+    },
     q: { id: 'q', label: 'Q', type: 'float', defaultValue: 1, minValue: 0.1, maxValue: 20, unit: '', step: 0.1 },
     type: { id: 'type', label: 'Filter Type', type: 'enum', defaultValue: 'lowpass', enumValues: ['lowpass', 'highpass', 'bandpass', 'notch', 'allpass', 'lowshelf', 'highshelf', 'peaking'] },
     gain: { id: 'gain', label: 'Gain (Shelving/Peaking)', type: 'float', defaultValue: 0, minValue: -24, maxValue: 24, unit: 'dB', step: 0.1 },
   },
   oscillator: { // MODIFIED: Was example, now fully defined
-    frequency: { id: 'frequency', label: 'Frequency', type: 'float', defaultValue: 440, minValue: 20, maxValue: 20000, unit: 'Hz', step: 1 },
+    frequency: {
+      id: 'frequency',
+      label: 'Frequency',
+      type: 'float',
+      defaultValue: 440,
+      minValue: 0.5, // Lowered from 20Hz to 0.5Hz
+      maxValue: 20000,
+      unit: 'Hz',
+      step: 0.1,
+      scale: 'logarithmic' // Added logarithmic scale
+    },
     type: { id: 'type', label: 'Waveform', type: 'enum', defaultValue: 'sine' as OscillatorWaveformType, enumValues: ['sine', 'square', 'sawtooth', 'triangle'] },
     gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.7, minValue: 0, maxValue: 1, unit: '', step: 0.01 },
   },
   noise: {
     type: { id: 'type', label: 'Noise Type', type: 'enum', defaultValue: 'white', enumValues: ['white', 'pink', 'brownian'] },
     gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '', step: 0.01 },
+  },
+  // ADDED: Waveshaper node parameters
+  waveshaper: {
+    amount: { id: 'amount', label: 'Amount', type: 'float', defaultValue: 1.0, minValue: 0.1, maxValue: 50, unit: '', step: 0.1 },
+    drive: { id: 'drive', label: 'Drive', type: 'float', defaultValue: 1.0, minValue: 0.1, maxValue: 10, unit: '', step: 0.1 },
+    mix: { id: 'mix', label: 'Mix', type: 'float', defaultValue: 1.0, minValue: 0, maxValue: 1, unit: '', step: 0.01 },
+    curveType: { id: 'curveType', label: 'Curve Type', type: 'enum', defaultValue: 'soft' as WaveshaperCurveType, enumValues: ['soft', 'hard', 'sin', 'tanh', 'atan', 'clip', 'fold'] },
+    oversample: { id: 'oversample', label: 'Oversample', type: 'boolean', defaultValue: false },
   },
   microphone: { // ADDED: Microphone node definition (minimal for now)
     gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 1, minValue: 0, maxValue: 2, unit: '', step: 0.01 },

@@ -31,7 +31,8 @@ export class KernelRegistry {
     this.register('biquad', Kernels.processBiquad);
     this.register('passthrough', Kernels.passthroughKernel); // Corrected from processPassthrough
     this.register('noise', Kernels.noiseKernel);
-    this.register('oscillator', Kernels.oscillatorKernel); // ADDED
+    this.register('oscillator', Kernels.oscillatorKernel);
+    this.register('waveshaper', Kernels.waveshaperKernel); // ADDED waveshaper
     // Add other kernels here if they follow the same naming convention
   }
 
