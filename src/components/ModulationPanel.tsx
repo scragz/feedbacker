@@ -1,5 +1,5 @@
 import { Box, Flex, Group, Select, Slider, Switch, Text, Tooltip } from '@mantine/core';
-import { IconWaveSine, IconWaveSquare, IconWaveSawTooth } from '@tabler/icons-react';
+import { IconWaveSine, IconWaveSquare, IconWaveSawTool } from '@tabler/icons-react';
 import type { LFOWaveformType } from '../audio/schema';
 
 interface ModulationPanelProps {
@@ -24,7 +24,7 @@ const waveformIcons = {
   sine: <IconWaveSine size={18} />,
   square: <IconWaveSquare size={18} />,
   triangle: <IconWaveSine size={18} stroke={1.5} />,
-  sawtooth: <IconWaveSawTooth size={18} />,
+  sawtooth: <IconWaveSawTool size={18} />,
   random: <IconWaveSquare size={18} stroke={1.5} />
 };
 
@@ -54,7 +54,7 @@ export function ModulationPanel({
             <Text fw={500}>LFO 1</Text>
             <Switch
               checked={lfo1.enabled}
-              onChange={(event) => onLFOChange(1, 'enabled', event.currentTarget.checked)}
+              onChange={(event) => { onLFOChange(1, 'enabled', event.currentTarget.checked) }}
               label="Enabled"
               labelPosition="left"
             />
@@ -66,7 +66,7 @@ export function ModulationPanel({
               size="xs"
               data={waveformOptions}
               value={lfo1.waveform}
-              onChange={(value) => value && onLFOChange(1, 'waveform', value)}
+              onChange={(value) => { onLFOChange(1, 'waveform', value ?? 'sine') }}
               leftSection={waveformIcons[lfo1.waveform]}
               disabled={!lfo1.enabled}
               style={{ flex: 1 }}
@@ -80,7 +80,7 @@ export function ModulationPanel({
               max={20}
               step={0.1}
               value={lfo1.frequency}
-              onChange={(value) => onLFOChange(1, 'frequency', value)}
+              onChange={(value) => { onLFOChange(1, 'frequency', value ) }}
               label={(value) => `${value.toFixed(1)} Hz`}
               disabled={!lfo1.enabled}
               scale={(val) => Math.log10(val / 0.1) / Math.log10(20 / 0.1) * 100}
@@ -94,7 +94,7 @@ export function ModulationPanel({
               max={1}
               step={0.01}
               value={lfo1.amount}
-              onChange={(value) => onLFOChange(1, 'amount', value)}
+              onChange={(value) => { onLFOChange(1, 'amount', value) }}
               label={(value) => `${Math.round(value * 100)}%`}
               disabled={!lfo1.enabled}
             />
@@ -107,7 +107,7 @@ export function ModulationPanel({
             <Text fw={500}>LFO 2</Text>
             <Switch
               checked={lfo2.enabled}
-              onChange={(event) => onLFOChange(2, 'enabled', event.currentTarget.checked)}
+              onChange={(event) => { onLFOChange(2, 'enabled', event.currentTarget.checked) }}
               label="Enabled"
               labelPosition="left"
             />
@@ -119,7 +119,7 @@ export function ModulationPanel({
               size="xs"
               data={waveformOptions}
               value={lfo2.waveform}
-              onChange={(value) => value && onLFOChange(2, 'waveform', value)}
+              onChange={(value) => { onLFOChange(2, 'waveform', value ?? 'sine') }}
               leftSection={waveformIcons[lfo2.waveform]}
               disabled={!lfo2.enabled}
               style={{ flex: 1 }}
@@ -133,7 +133,7 @@ export function ModulationPanel({
               max={10}
               step={0.05}
               value={lfo2.frequency}
-              onChange={(value) => onLFOChange(2, 'frequency', value)}
+              onChange={(value) => { onLFOChange(2, 'frequency', value) }}
               label={(value) => `${value.toFixed(2)} Hz`}
               disabled={!lfo2.enabled}
               scale={(val) => Math.log10(val / 0.05) / Math.log10(10 / 0.05) * 100}
@@ -147,7 +147,7 @@ export function ModulationPanel({
               max={1}
               step={0.01}
               value={lfo2.amount}
-              onChange={(value) => onLFOChange(2, 'amount', value)}
+              onChange={(value) => { onLFOChange(2, 'amount', value) }}
               label={(value) => `${Math.round(value * 100)}%`}
               disabled={!lfo2.enabled}
             />

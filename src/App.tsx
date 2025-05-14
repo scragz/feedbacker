@@ -447,8 +447,8 @@ function App() {
     }
 
     setAudioGraph(prevGraph => {
-      const lfoKey = `lfo${lfoNumber}` as 'lfo1' | 'lfo2';
-      const currentLfo = prevGraph[lfoKey] || {
+      const lfoKey = `lfo${lfoNumber}` as const;
+      const currentLfo = prevGraph[lfoKey] ?? {
         enabled: false,
         frequency: lfoNumber === 1 ? 1.0 : 0.5,
         waveform: lfoNumber === 1 ? 'sine' : 'triangle',

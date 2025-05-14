@@ -48,7 +48,7 @@ export function TransportBar({
           <IconVolumeOff size={18} />
           <Switch
             checked={!isMono}
-            onChange={(event) => onMonoToggle(!event.currentTarget.checked)}
+            onChange={(event) => { onMonoToggle(!event.currentTarget.checked) }}
             label={isMono ? "Mono" : "Stereo"}
             labelPosition="right"
           />
