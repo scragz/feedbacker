@@ -346,7 +346,7 @@ function App() {
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
       <LayoutShell
-        appHeader={<Header title="MFN Web Audio Feedbacker" />}
+        appHeader={<Header title="Feedbacker" />}
         transportBar={(
           <TransportBar
             audioContextState={audioContextState}

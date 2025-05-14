@@ -41,7 +41,7 @@ export const theme = createTheme({
     sizes: {
       h1: {
         fontWeight: '100',
-        fontSize: '6rem',
+        fontSize: '3rem',
         lineHeight: '1.4',
       },
     },

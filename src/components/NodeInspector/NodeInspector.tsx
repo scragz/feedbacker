@@ -49,7 +49,12 @@ export function NodeInspector({
                 min={paramDef.minValue}
                 max={paramDef.maxValue}
                 step={0.01}
-                label={(value) => `${value.toFixed(paramDef.unit === '%' || paramDef.unit === 'dB' ? 1 : 2)} ${paramDef.unit ?? ''}`.trim()}
+                label={(value) => {
+                  if (typeof value === 'number') {
+                    return `${value.toFixed(paramDef.unit === '%' || paramDef.unit === 'dB' ? 1 : 2)} ${paramDef.unit ?? ''}`.trim();
+                  }
+                  return String(value); // Fallback for non-numeric values
+                }}
                 // Consider adding marks if paramDef.marks is available
               />
               <Text size="xs" c="dimmed" mt={2}>

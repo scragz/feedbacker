@@ -8,7 +8,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ title }) => {
   return (
-    <Title order={3} className={classes.header}>
+    <Title order={1} className={classes.header}>
       {title}
     </Title>
   );
