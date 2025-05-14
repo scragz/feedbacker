@@ -76,6 +76,7 @@ class MfnProcessor extends AudioWorkletProcessor {
 
   private sampleRateInternal: number = globalThis.AudioWorkletGlobalScope?.sampleRate ?? 44100;
   private maxOutputChannels: number = DEFAULT_OUTPUT_CHANNELS;
+  private chaosValue: number = 0; // Added internal state for chaos
 
   private currentBlockOutputChannels: number = DEFAULT_OUTPUT_CHANNELS;
   private currentBlockSize: number = DEFAULT_BLOCK_SIZE;
@@ -141,6 +142,8 @@ class MfnProcessor extends AudioWorkletProcessor {
     this.graph = payload.graph;
     this._buildGraphInternals();
     this.isInitialized = true;
+    // Though PROCESSOR_READY doesn't send the graph, let's log what the graph state is after init.
+    console.log('[MFNProcessor] After _initProcessor, graph nodes count:', this.graph?.nodes.length);
     this.port.postMessage({ type: WorkletMessageType.PROCESSOR_READY });
     console.log('[MFNProcessor] Processor ready.');
   }
@@ -152,8 +155,9 @@ class MfnProcessor extends AudioWorkletProcessor {
     } else {
       this.graph = payload.graph;
     }
-    console.log('[MFNProcessor] Updating graph:', this.graph);
+    console.log('[MFNProcessor] Updating graph with payload:', payload.graph);
     this._buildGraphInternals();
+    console.log('[MFNProcessor] After _updateGraph and _buildGraphInternals, sending GRAPH_UPDATED. Nodes count:', this.graph?.nodes.length, 'Node IDs:', this.graph?.nodes.map(n => n.id).join(', '));
     this.port.postMessage({ type: WorkletMessageType.GRAPH_UPDATED, payload: this.graph });
   }
 
@@ -230,11 +234,13 @@ class MfnProcessor extends AudioWorkletProcessor {
       return;
     }
 
+    console.log(`[MFNProcessor] Before adding node ${nodeInstance.id}, current nodes count: ${this.graph.nodes.length}, IDs: ${this.graph.nodes.map(n => n.id).join(', ')}`);
     this.graph.nodes.push(nodeInstance);
     this.nodeOrder.push(nodeInstance.id);
+    console.log(`[MFNProcessor] After adding node ${nodeInstance.id} to array, current nodes count: ${this.graph.nodes.length}, IDs: ${this.graph.nodes.map(n => n.id).join(', ')}`);
 
-    // const kernel = kernelRegistry[nodeInstance.type] ?? passthroughKernel; // Old way
-    const kernel = kernelRegistry.getKernel(nodeInstance.type) ?? passthroughKernel; // New way
+
+    const kernel = kernelRegistry.getKernel(nodeInstance.type) ?? passthroughKernel;
     this.kernels.set(nodeInstance.id, kernel);
     this.nodeStates.set(nodeInstance.id, {});
 
@@ -242,14 +248,13 @@ class MfnProcessor extends AudioWorkletProcessor {
 
     const prevOutputs: Float32Array[] = Array.from(
       { length: nodeChannelCount },
-      // this.currentBlockSize might not be set before the first process call, so default is safer
       () => new Float32Array(this.currentBlockSize || DEFAULT_BLOCK_SIZE).fill(0)
     );
     this.previousKernelOutputBuffers.set(nodeInstance.id, prevOutputs);
 
     this._resizeAndAdaptRoutingMatrixForAddedNode(nodeInstance);
 
-    console.log(`[MFNProcessor] Node ${nodeInstance.id} added. New graph:`, JSON.parse(JSON.stringify(this.graph))); // Deep copy for logging
+    console.log(`[MFNProcessor] Node ${nodeInstance.id} added. Sending GRAPH_UPDATED. Nodes count: ${this.graph.nodes.length}, Node IDs: ${this.graph.nodes.map(n => n.id).join(', ')}`);
     this.port.postMessage({ type: WorkletMessageType.GRAPH_UPDATED, payload: this.graph });
   }
 
@@ -334,9 +339,11 @@ class MfnProcessor extends AudioWorkletProcessor {
       console.warn(`[MFNProcessor] Node with ID ${nodeId} not found. Ignoring REMOVE_NODE.`);
       return;
     }
-
+    console.log(`[MFNProcessor] Before removing node ${nodeId}, current nodes count: ${this.graph.nodes.length}, IDs: ${this.graph.nodes.map(n => n.id).join(', ')}`);
     this.graph.nodes.splice(nodeIndex, 1);
     this.nodeOrder.splice(nodeIndex, 1);
+    console.log(`[MFNProcessor] After removing node ${nodeId} from array, current nodes count: ${this.graph.nodes.length}, IDs: ${this.graph.nodes.map(n => n.id).join(', ')}`);
+
 
     this.kernels.delete(nodeId);
     this.nodeStates.delete(nodeId);
@@ -344,7 +351,7 @@ class MfnProcessor extends AudioWorkletProcessor {
 
     this._createDefaultRoutingMatrix();
 
-    console.log(`[MFNProcessor] Node ${nodeId} removed. New graph:`, JSON.parse(JSON.stringify(this.graph)));
+    console.log(`[MFNProcessor] Node ${nodeId} removed. Sending GRAPH_UPDATED. Nodes count: ${this.graph.nodes.length}, Node IDs: ${this.graph.nodes.map(n => n.id).join(', ')}`);
     this.port.postMessage({ type: WorkletMessageType.GRAPH_UPDATED, payload: this.graph });
   }
 
@@ -372,7 +379,14 @@ class MfnProcessor extends AudioWorkletProcessor {
     if (parameterId === 'masterGain' && typeof value === 'number') {
         this.graph.masterGain = value;
         console.log(`[MFNProcessor] Master gain updated to ${value}.`);
-        this.port.postMessage({ type: WorkletMessageType.GRAPH_UPDATED, payload: this.graph });
+        // It might be good to send GRAPH_UPDATED if masterGain is part of the graph state
+        // that the main thread might want to be aware of for UI syncing.
+        // However, if it's purely an audio processing param, this is fine.
+        // For now, let's assume App.tsx handles its own masterGain UI if needed
+        // and this message is primarily for the worklet's internal gain.
+    } else if (parameterId === 'chaos' && typeof value === 'number') {
+        this.chaosValue = value;
+        console.log(`[MFNProcessor] Chaos value updated to ${this.chaosValue}.`);
     } else {
         console.warn(`[MFNProcessor] Unknown global parameter: ${parameterId}`);
     }
@@ -428,6 +442,7 @@ class MfnProcessor extends AudioWorkletProcessor {
     _parameters: Record<string, Float32Array>
   ): boolean {
     if (!this.isInitialized || !this.graph || this.graph.nodes.length === 0) {
+      // Fill outputs with silence if not ready
       for (const output of outputs) {
         for (const channelData of output) {
           channelData.fill(0);
@@ -439,10 +454,14 @@ class MfnProcessor extends AudioWorkletProcessor {
     this.currentBlockOutputChannels = outputs[0]?.length ?? DEFAULT_OUTPUT_CHANNELS;
     this.currentBlockSize = outputs[0]?.[0]?.length ?? DEFAULT_BLOCK_SIZE;
 
-    // Assuming this.graph.masterGain is always a number as per schema
     const masterGain = this.graph.masterGain;
     const numNodes = this.graph.nodes.length;
     const nodeInstances = this.graph.nodes;
+
+    // Log global parameters for debugging
+    if (this.logCounter % this.logThrottle === 0) {
+        console.log(`[MFNProcessor process] Master Gain: ${masterGain}, Chaos: ${this.chaosValue}`);
+    }
 
     const currentKernelOutputBuffers: Map<NodeId, Float32Array[]> = new Map<NodeId, Float32Array[]>();
     for (const node of nodeInstances) {
@@ -498,96 +517,69 @@ class MfnProcessor extends AudioWorkletProcessor {
       kernel(mixedInputsForDestNode, kernelSpecificOutputs, destNode, this.currentBlockSize, this.sampleRateInternal, destNodeEffectiveChannelCount, state);
     }
 
-    const finalOutputBuffers = outputs[0];
-    for (let c = 0; c < this.currentBlockOutputChannels; c++) {
-      finalOutputBuffers[c]?.fill(0);
+    const finalOutputBuffers = outputs[0]; // Assuming outputs[0] is the main output
+
+    // Clear final output buffers before summing
+    for (let i = 0; i < finalOutputBuffers.length; i++) {
+      finalOutputBuffers[i].fill(0);
     }
 
-    const outputMixerNodeInstance = nodeInstances.find(n => n.type === 'output_mixer');
-    if (outputMixerNodeInstance) {
-      const mixerOutput = currentKernelOutputBuffers.get(outputMixerNodeInstance.id);
-      if (mixerOutput) {
-        for (let c = 0; c < Math.min(this.currentBlockOutputChannels, mixerOutput.length); c++) {
-          if (finalOutputBuffers[c] && mixerOutput[c]) {
-            for (let s = 0; s < this.currentBlockSize; s++) {
-              finalOutputBuffers[c][s] = mixerOutput[c][s] * masterGain;
-            }
+    let outputMixerFound = false;
+    const outputMixerNode = nodeInstances.find(n => n.type === 'output_mixer');
+
+    if (outputMixerNode) {
+      outputMixerFound = true;
+      const outputMixerBuffers = currentKernelOutputBuffers.get(outputMixerNode.id);
+      if (outputMixerBuffers) {
+        for (let i = 0; i < Math.min(finalOutputBuffers.length, outputMixerBuffers.length); i++) {
+          for (let s = 0; s < this.currentBlockSize; s++) {
+            finalOutputBuffers[i][s] = outputMixerBuffers[i][s]; // Directly take output_mixer's output
           }
+        }
+      } else {
+        if (this.logCounter % this.logThrottle === 0) {
+            console.warn(`[MFNProcessor process] Output mixer node (${outputMixerNode.id}) found, but its buffers are not in currentKernelOutputBuffers.`);
         }
       }
     } else {
+      // Fallback: if no output_mixer, sum all node outputs (excluding any other potential mixers if that logic was more complex)
+      // This simple sum might not be ideal for complex graphs without an explicit mixer.
+      if (this.logCounter % this.logThrottle === 0) {
+        console.log('[MFNProcessor process] No output_mixer node found. Summing all node outputs directly (if any).');
+      }
       for (const node of nodeInstances) {
-        if (node.type === 'output_mixer') continue; // Should not happen if find succeeded, but defensive
-
-        const nodeOutput = currentKernelOutputBuffers.get(node.id);
-        if (nodeOutput) {
-          for (let c = 0; c < Math.min(this.currentBlockOutputChannels, nodeOutput.length); c++) {
-            if (finalOutputBuffers[c] && nodeOutput[c]) {
-              for (let s = 0; s < this.currentBlockSize; s++) {
-                finalOutputBuffers[c][s] += nodeOutput[c][s] * masterGain;
-              }
+        const nodeOutputBuffers = currentKernelOutputBuffers.get(node.id);
+        if (nodeOutputBuffers) {
+          for (let i = 0; i < Math.min(finalOutputBuffers.length, nodeOutputBuffers.length); i++) {
+            for (let s = 0; s < this.currentBlockSize; s++) {
+              finalOutputBuffers[i][s] += nodeOutputBuffers[i][s]; // Summing
             }
           }
         }
       }
     }
 
-    // Update previousKernelOutputBuffers for the next block
-    for (const [nodeId, currentOutputs] of currentKernelOutputBuffers) {
-      let prevOutputChannels = this.previousKernelOutputBuffers.get(nodeId);
+    // Log a snippet of pre-gain output for the first channel
+    if (this.logCounter % this.logThrottle === 0 && finalOutputBuffers[0] && finalOutputBuffers[0].length > 5) {
+        console.log(`[MFNProcessor process] OutputMixerFound: ${outputMixerFound}. Pre-MasterGain Output (Ch0, 5 samples): ${finalOutputBuffers[0].slice(0, 5).join(', ')}`);
+    }
 
-      // Ensure the entry for the node exists in previousKernelOutputBuffers
-      if (!prevOutputChannels) {
-        if (this.logCounter % (this.logThrottle * 5) === 0) {
-            console.warn(`[MFNProcessor] process: Creating previousKernelOutputBuffers entry for node ${nodeId} as it was missing. Ch count: ${currentOutputs.length}, BlockSize: ${this.currentBlockSize}`);
-        }
-        prevOutputChannels = currentOutputs.map(arr => new Float32Array(arr.length));
-        this.previousKernelOutputBuffers.set(nodeId, prevOutputChannels);
-      }
-
-      // Ensure channel counts match
-      if (prevOutputChannels.length !== currentOutputs.length) {
-        if (this.logCounter % (this.logThrottle * 5) === 0) {
-            console.warn(`[MFNProcessor] process: Channel count mismatch for node ${nodeId} during prevOutput update. Prev: ${prevOutputChannels.length}, Curr: ${currentOutputs.length}. Re-mapping.`);
-        }
-        prevOutputChannels = currentOutputs.map(arr => new Float32Array(arr.length));
-        this.previousKernelOutputBuffers.set(nodeId, prevOutputChannels);
-      }
-
-      for (let c = 0; c < currentOutputs.length; c++) {
-        // Ensure channel buffer exists and lengths match
-        if (prevOutputChannels[c] && prevOutputChannels[c].length === currentOutputs[c].length) {
-          prevOutputChannels[c].set(currentOutputs[c]);
-        } else {
-          if (this.logCounter % (this.logThrottle * 5) === 0) {
-            console.warn(`[MFNProcessor] process: Buffer length mismatch for node ${nodeId}, channel ${c} during prevOutput update. Prev len: ${prevOutputChannels[c]?.length}, Curr len: ${currentOutputs[c]?.length}. BlockSize: ${this.currentBlockSize}. Re-creating buffer for this channel.`);
-          }
-          // Recreate this specific channel's buffer if it's problematic
-          prevOutputChannels[c] = new Float32Array(currentOutputs[c].length);
-          prevOutputChannels[c].set(currentOutputs[c]);
-        }
+    // Apply master gain
+    for (let i = 0; i < finalOutputBuffers.length; i++) {
+      for (let s = 0; s < this.currentBlockSize; s++) {
+        finalOutputBuffers[i][s] *= masterGain;
       }
     }
 
-    if (this.logCounter % this.logThrottle === 0 && nodeInstances.length > 0) {
-        // console.log(`[MFNProcessor process #${this.logCounter}] End of block. MasterGain: ${masterGain}, Nodes: ${nodeInstances.length}`);
-        // const noiseNode = nodeInstances.find(n => n.type === 'noise');
-        // if (noiseNode) {
-        //     const noiseCurrentOut = currentKernelOutputBuffers.get(noiseNode.id);
-        //     const noisePrevOut = this.previousKernelOutputBuffers.get(noiseNode.id);
-        //     if (noiseCurrentOut?.[0]?.[0] !== undefined) {
-        //         console.log(`  Noise (${noiseNode.id}) current ch0[0]: ${noiseCurrentOut[0][0].toFixed(3)}`);
-        //     }
-        //     if (noisePrevOut?.[0]?.[0] !== undefined) {
-        //          console.log(`  Noise (${noiseNode.id}) prev ch0[0]: ${noisePrevOut[0][0].toFixed(3)} (after update)`);
-        //     }
-        // }
-        // if (finalOutputBuffers[0]?.[0] !== undefined) {
-        //   console.log(`  Final output ch0[0]: ${finalOutputBuffers[0][0].toFixed(3)}`);
-        // }
+    // Log a snippet of post-gain output for the first channel
+    if (this.logCounter % this.logThrottle === 0 && finalOutputBuffers[0] && finalOutputBuffers[0].length > 5) {
+        console.log(`[MFNProcessor process] Post-MasterGain Output (Ch0, 5 samples): ${finalOutputBuffers[0].slice(0, 5).join(', ')}`);
     }
+
+
+    this.previousKernelOutputBuffers = new Map(currentKernelOutputBuffers); // Save current outputs for next block's feedback
+
     this.logCounter++;
-
     return true;
   }
 }

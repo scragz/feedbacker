@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { MantineProvider, LoadingOverlay, Stack, ScrollArea } from '@mantine/core';
 import { theme } from './theme';
 import { nanoid } from 'nanoid';
@@ -82,29 +82,62 @@ function App() {
   const [audioContextState, setAudioContextState] = useState<AudioContextState | null>(null);
   const [globalParameters, setGlobalParameters] = useState<Record<string, number>>({ chaos: 0 });
   const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [appStatus, setAppStatus] = useState<string>('Initializing application...');
+  const [appWorkletError, setAppWorkletError] = useState<WorkletErrorPayload | null>(null);
+
+  // Memoized callback for when the processor is ready
+  const handleProcessorReadyAppCallback = useCallback(() => {
+    console.log('App.tsx: onProcessorReady callback (from useAudioInitialization) triggered.');
+    // App-specific logic to run after processor is marked ready can go here.
+    // The core setProcessorReady(true) is handled directly by useAudioInitialization.
+  }, []);
+
+  const handleGraphUpdateMessage = useCallback((graph: AudioGraph) => {
+    setAudioGraph(graph);
+  }, [setAudioGraph]);
+
+  const handleParameterUpdateMessage = useCallback(({ nodeId, parameterId, value }: ParameterUpdatePayload) => {
+    setAudioGraph(prevGraph => ({
+      ...prevGraph,
+      nodes: prevGraph.nodes.map(n =>
+        n.id === nodeId
+          ? { ...n, parameters: { ...n.parameters, [parameterId]: value } }
+          : n
+      ),
+    }));
+  }, [setAudioGraph]);
+
+  const handleWorkletErrorMessage = useCallback((error: WorkletErrorPayload) => {
+    console.error('[App] Received WORKLET_ERROR:', error.message);
+    setAppStatus(`Worklet Error: ${error.message}`);
+    setAppWorkletError(error);
+  }, [setAppStatus, setAppWorkletError]); // Added setAppWorkletError
 
   const {
-    audioContextRef,
+    audioContextRef, // Corrected: was audioContext
     workletNodeRef,
     audioInitialized,
   } = useAudioInitialization({
-    setAudioGraph, // This will be the primary way graph state is updated from worklet
-    setAudioError,
-    setProcessorReady,
-    setAudioContextState,
+    // State setters for the hook to update App.tsx state
+    setAudioGraph: setAudioGraph,
+    setAudioError: setAudioError,
+    setProcessorReady: setProcessorReady,
+    setAudioContextState: setAudioContextState,
+  });
+
+  const {
+    initMessageSent,
+  } = useProcessorInitialization({
+    audioInitialized,
+    workletNodeRef,
+    audioContextRef,
+    audioGraph,
   });
 
   useProcessorStatusCheck({
     audioContextState,
     workletNodeRef,
     processorReady,
-  });
-
-  const { initMessageSent } = useProcessorInitialization({
-    audioInitialized,
-    workletNodeRef,
-    audioContextRef,
-    audioGraph,
   });
 
   // Effect to clear selectedNodeId if it's no longer in the graph
