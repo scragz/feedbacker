@@ -162,7 +162,7 @@ const MatrixCanvas: React.FC<MatrixCanvasProps> = ({
         console.log("Clicked in label area, ignoring.");
         return;
       }
-      
+
       if (
         clickedSourceNodeIndex < 0 || clickedSourceNodeIndex >= numNodes ||
         clickedTargetNodeIndex < 0 || clickedTargetNodeIndex >= numNodes

@@ -48,8 +48,9 @@ export function useAudioInitialization({
 
           switch (type) {
             case WorkletMessageType.PROCESSOR_READY:
+              console.log('[useAudioInitialization.ts] Received PROCESSOR_READY. Setting processorReady to true.');
               setProcessorReady(true);
-              console.log('[useAudioInitialization.ts] Audio processor is ready.');
+              // console.log('[useAudioInitialization.ts] Audio processor is ready.'); // Original log
               break;
             case WorkletMessageType.PARAMETER_UPDATED:
               setAudioGraph(prevGraph => ({
@@ -63,13 +64,27 @@ export function useAudioInitialization({
               break;
             case WorkletMessageType.GRAPH_UPDATED:
               // This is the main way the graph should be updated from the worklet if it's the source of truth
+              console.log('[useAudioInitialization.ts] Received GRAPH_UPDATED from worklet. Updating graph.');
               setAudioGraph(payload);
-              console.log('[useAudioInitialization.ts] Graph updated from worklet via GRAPH_UPDATED.');
+              // console.log('[useAudioInitialization.ts] Graph updated from worklet via GRAPH_UPDATED.'); // Original log
               break;
             case WorkletMessageType.PROCESSOR_STATUS: // Added case
               console.log('[useAudioInitialization.ts] Received PROCESSOR_STATUS:', payload);
-              setProcessorReady(payload.isInitialized);
-              // Optionally, you could also update other state based on payload.graphNodeCount
+              // Only update if the new status is different to avoid unnecessary re-renders if already correct.
+              // This also helps prevent a delayed PROCESSOR_STATUS (false) from overriding a recent PROCESSOR_READY (true).
+              // However, if the processor explicitly states it's not initialized, we must honor that.
+              setProcessorReady(prev => {
+                if (prev !== payload.isInitialized) {
+                  console.log(`[useAudioInitialization.ts] PROCESSOR_STATUS: Updating processorReady from ${prev} to ${payload.isInitialized}.`);
+                  return payload.isInitialized;
+                }
+                return prev;
+              });
+              if (payload.isInitialized) {
+                // console.log('[useAudioInitialization.ts] Audio processor is confirmed ready (from PROCESSOR_STATUS).');
+              } else {
+                // console.warn('[useAudioInitialization.ts] Audio processor reported NOT ready (from PROCESSOR_STATUS).');
+              }
               break;
             case WorkletMessageType.WORKLET_ERROR:
             // case WorkletMessageType.NODE_ERROR: // NODE_ERROR was removed, WORKLET_ERROR covers it

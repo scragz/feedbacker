@@ -1,26 +1,29 @@
-import type { AudioNodeInstance } from '../schema';
+import type { ParameterValue } from '../schema'; // Import ParameterValue
+
+// NodeState can be defined here
+export type NodeState = Record<string, unknown>; // Using 'unknown' for better type safety than 'any'
 
 /**
  * Interface for a DSP kernel processing function.
  *
  * @param inputs - The input audio buffers for the node (Float32Array[channelIndex][sampleIndex]).
- *                 These are the already mixed inputs for the current node.
+ *                 These are the already mixed inputs for the current node. Each Float32Array is a channel.
  * @param outputs - The output audio buffers for the node (Float32Array[channelIndex][sampleIndex]).
- *                  The kernel function should write its processed audio data here.
- * @param node - The AudioNodeInstance providing parameters and type.
- * @param blockSize - The number of samples in the current processing block.
- * @param sampleRate - The current sample rate.
- * @param numChannels - The number of channels being processed.
+ *                  The kernel function should write its processed audio data here. Each Float32Array is a channel.
+ * @param parameters - The parameters for the current audio node instance.
  * @param nodeState - An object to manage state for individual audio nodes within the processor.
+ * @param sampleRate - The current sample rate.
+ * @param blockSize - The number of samples in the current processing block (i.e., length of each channel array).
+ * @param numChannels - The number of channels being processed for this node (i.e., length of inputs/outputs arrays).
  */
 export type DSPKernel = (
-  inputs: Float32Array[], // input port 0: [channelIndex][sampleIndex]
-  outputs: Float32Array[], // output port 0: [channelIndex][sampleIndex]
-  node: AudioNodeInstance,
-  blockSize: number,
+  inputs: Float32Array[],
+  outputs: Float32Array[],
+  parameters: Record<string, ParameterValue | undefined>,
+  nodeState: NodeState,
   sampleRate: number,
-  numChannels: number,
-  nodeState: Record<string, any>, // Added to manage state for nodes like delay, biquad
+  blockSize: number,
+  numChannels: number
 ) => void;
 
 /**
@@ -29,4 +32,4 @@ export type DSPKernel = (
  * export type NodeState = Record<string, Float32Array | number | boolean | object>;
  * Using a simpler approach for now, can be refined later.
  */
-export type NodeState = Record<string, unknown>;
+// The NodeState type is now defined above. This comment block can be removed or updated.

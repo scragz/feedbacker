@@ -514,7 +514,16 @@ class MfnProcessor extends AudioWorkletProcessor {
         }
         continue;
       }
-      kernel(mixedInputsForDestNode, kernelSpecificOutputs, destNode, this.currentBlockSize, this.sampleRateInternal, destNodeEffectiveChannelCount, state);
+      // Corrected kernel call arguments
+      kernel(
+        mixedInputsForDestNode,
+        kernelSpecificOutputs,
+        destNode.parameters, // Corrected: Pass node parameters
+        state, // Corrected: Pass node state
+        this.sampleRateInternal, // Corrected: Pass sample rate
+        this.currentBlockSize, // Corrected: Pass block size
+        destNodeEffectiveChannelCount // Corrected: Pass channel count
+      );
     }
 
     const finalOutputBuffers = outputs[0]; // Assuming outputs[0] is the main output

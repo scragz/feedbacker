@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollArea, Paper, Text, List, UnstyledButton } from '@mantine/core';
 import classes from './NodeList.module.css';
-import type { AudioNodeInstance } from '../../audio/schema';
+import type { AudioNodeInstance } from '../audio/schema';
 
 interface NodeListProps {
   nodes: AudioNodeInstance[];

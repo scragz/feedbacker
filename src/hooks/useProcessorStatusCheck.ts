@@ -1,59 +1,72 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { MainThreadMessageType } from '../audio/schema';
 
 interface UseProcessorStatusCheckProps {
   audioContextState: AudioContextState | null;
   workletNodeRef: React.RefObject<AudioWorkletNode | null>;
   processorReady: boolean;
+  audioInitialized: boolean;
+  appInitializationTime: number; // Timestamp when the app (or audio part) started initializing
 }
 
 export function useProcessorStatusCheck({
   audioContextState,
   workletNodeRef,
-  processorReady, // This is processorHandshakeComplete from App.tsx
+  processorReady,
+  audioInitialized,
+  appInitializationTime,
 }: UseProcessorStatusCheckProps) {
-  const [checkStatusSent, setCheckStatusSent] = useState(false);
+  const lastCheckTimestampRef = useRef<number>(0);
+  const initialGracePeriod = 2500; // Wait 2.5 seconds after app init before the first check
+  const checkInterval = 5000;    // Then check every 5 seconds if still not ready
 
   useEffect(() => {
-    // If processorReady (processorHandshakeComplete) becomes true, reset checkStatusSent.
-    // This allows a new check to be sent if the processor becomes not ready again (e.g., due to an error or re-initialization).
     if (processorReady) {
-      if (checkStatusSent) { // Only log and reset if it was previously sent and now processor is ready
-        console.log('[useProcessorStatusCheck.ts] Processor is now ready. Resetting checkStatusSent to false.');
-        setCheckStatusSent(false);
-      }
-      return; // Don't proceed to send a check if the processor is already marked as ready.
+      // If processor becomes ready, reset timestamp so a check can happen again if it becomes not ready later.
+      lastCheckTimestampRef.current = 0;
+      return;
     }
 
-    // Conditions for sending the check:
-    // 1. Audio context must be running.
-    // 2. Worklet node must exist.
-    // 3. Processor must NOT be ready yet (processorReady is false).
-    // 4. Status check must NOT have been sent already in the current "not ready" cycle.
-    if (audioContextState === 'running' && workletNodeRef.current && !processorReady && !checkStatusSent) {
-      console.log('[useProcessorStatusCheck.ts] Conditions met: Audio context running, worklet node available, processor NOT ready, status check NOT yet sent. Sending CHECK_PROCESSOR_STATUS.');
+    if (!audioInitialized || !workletNodeRef.current || audioContextState !== 'running') {
+      // console.log('[useProcessorStatusCheck.ts] Pre-conditions not met (audio not init, no worklet, or context not running). Skipping check.');
+      return;
+    }
+
+    const now = Date.now();
+
+    // Determine if it's time for the first check (after grace period) or a subsequent check
+    let shouldSendCheck = false;
+    if (lastCheckTimestampRef.current === 0) { // Potentially the first check cycle
+      if (now - appInitializationTime > initialGracePeriod) {
+        shouldSendCheck = true;
+      }
+    } else { // Subsequent check cycle
+      if (now - lastCheckTimestampRef.current > checkInterval) {
+        shouldSendCheck = true;
+      }
+    }
+
+    if (shouldSendCheck) {
+      console.log(`[useProcessorStatusCheck.ts] Conditions met (processorReady: false, audioInitialized: true, context: running). Sending CHECK_PROCESSOR_STATUS.`);
       workletNodeRef.current.port.postMessage({ type: MainThreadMessageType.CHECK_PROCESSOR_STATUS });
-      setCheckStatusSent(true);
-    } else if (!processorReady) { // Log details only if we are in a state where we *might* send, but don't (i.e., processor is not ready)
-      let reason = '[useProcessorStatusCheck.ts] Not sending CHECK_PROCESSOR_STATUS because:';
-      if (audioContextState !== 'running') {
-        reason += ` audioContextState is ${audioContextState} (expected 'running').`;
-      }
-      if (!workletNodeRef.current) {
-        reason += ' workletNodeRef.current is null.';
-      }
-      // processorReady is already known to be false here, so no need to check it as a negative condition.
-      if (checkStatusSent) {
-        reason += ' checkStatusSent is true (waiting for processor to become ready or for checkStatusSent to be reset).';
-      }
-      // Only log if there was a reason other than processorReady being true (which is handled by the first return).
-      if (audioContextState !== 'running' || !workletNodeRef.current || checkStatusSent) {
-        console.log(reason);
-      }
+      lastCheckTimestampRef.current = now;
     }
-  }, [audioContextState, processorReady, checkStatusSent, workletNodeRef]);
+    // else {
+    //   if (lastCheckTimestampRef.current === 0) {
+    //     // console.log(`[useProcessorStatusCheck.ts] Waiting for initial grace period. App init: ${new Date(appInitializationTime).toISOString()}, Now: ${new Date(now).toISOString()}`);
+    //   } else {
+    //     // console.log(`[useProcessorStatusCheck.ts] Waiting for check interval. Last check: ${new Date(lastCheckTimestampRef.current).toISOString()}, Now: ${new Date(now).toISOString()}`);
+    //   }
+    // }
+  }, [
+    audioContextState,
+    processorReady,
+    workletNodeRef,
+    audioInitialized,
+    appInitializationTime,
+    initialGracePeriod,
+    checkInterval
+  ]);
 
-  // This hook primarily manages an effect; its return value might not be essential for App.tsx.
-  // Returning checkStatusSent can be useful for debugging or more complex parent logic if needed.
-  return { checkStatusSent };
+  // This hook is side-effect only.
 }

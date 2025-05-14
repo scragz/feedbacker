@@ -37,7 +37,7 @@ export const theme = createTheme({
     mfnOrange,
   },
   headings: {
-    fontFamily: "Frijole, sans-serif",
+    fontFamily: "Space Grotesk, sans-serif",
     sizes: {
       h1: {
         fontWeight: '100',

@@ -1,0 +1,7 @@
+- more node types
+  - 1. WaveshaperNode
+  - 2. ConvolverNode
+  - 3. DynamicsCompressorNode
+- mono mode (this should have the grid be just one channel and then split the output to stereo)
+- we need to beef up the modulation. we want to have two global LFOs. every numeric parameter should have little buttons to enable LFO1 or LFO2 along with a small knob to control amount
+- chaos needs to be a scaling factor for a bunch of params across current nodes

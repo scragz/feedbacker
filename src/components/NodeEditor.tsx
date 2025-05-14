@@ -1,7 +1,7 @@
 import React from 'react';
 import { Paper, Text, Title, Box, Group, Slider, NumberInput } from '@mantine/core';
 import classes from './NodeEditor.module.css';
-import type { AudioNodeInstance, ParameterValue } from '../../audio/schema';
+import type { AudioNodeInstance, ParameterValue } from '../audio/schema';
 
 interface NodeEditorProps {
   selectedNode: AudioNodeInstance | null;

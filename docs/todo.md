@@ -85,7 +85,7 @@
   - **Files**: `src/components/MatrixCanvas.tsx`, small helper in `lib/canvas-utils.ts`.
   - **Dependencies**: Step 9
 
-- [ ] **Step 11: TransportBar & NodeInspector**
+- [x] **Step 11: TransportBar & NodeInspector**
   - **Task**:
     - `components/TransportBar.tsx`: play/stop, record, chaos knob.
     - `components/NodeInspector.tsx`: parameter sliders tied to selected node.

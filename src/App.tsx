@@ -1,17 +1,16 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { MantineProvider, LoadingOverlay, Stack, ScrollArea } from '@mantine/core';
-import { theme } from './theme';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { nanoid } from 'nanoid';
-
-import LayoutShell from './components/LayoutShell/LayoutShell';
-import Header from './components/Header/Header';
-import TransportBar from './components/TransportBar/TransportBar';
-import Controls from './components/Controls/Controls';
-import Pedalboard from './components/Pedalboard/Pedalboard';
-import NodeList from './components/NodeList/NodeList';
-import NodeInspector from './components/NodeInspector/NodeInspector';
-import StatusDisplay from './components/StatusDisplay/StatusDisplay';
-import MatrixCanvas from './components/MatrixCanvas'; // Added import
+import { MantineProvider, Stack, LoadingOverlay, ScrollArea } from '@mantine/core';
+import { theme } from './theme';
+import Header from './components/Header';
+import Controls from './components/Controls';
+import NodeList from './components/NodeList';
+import NodeInspector from './components/NodeInspector';
+import StatusDisplay from './components/StatusDisplay';
+import Pedalboard from './components/Pedalboard';
+import LayoutShell from './components/LayoutShell';
+import TransportBar from './components/TransportBar';
+import MatrixCanvas from './components/MatrixCanvas';
 
 import { useAudioInitialization } from './hooks/useAudioInitialization';
 import { useProcessorInitialization } from './hooks/useProcessorInitialization';
@@ -28,7 +27,7 @@ import {
   NODE_PARAMETER_DEFINITIONS,
   type MainThreadMessage,
   type RoutingMatrix,
-  type UpdateGraphMessage, // Added import
+  type UpdateGraphMessage,
 } from './audio/schema';
 
 // Initial state setup directly in App.tsx
@@ -69,12 +68,13 @@ const initializeRoutingMatrix = (nodeCount: number, channelCount: number): Routi
 
 const initialGraph: AudioGraph = {
   nodes: [initialOutputMixer],
-  routingMatrix: initializeRoutingMatrix(1, initialOutputChannels), // 1 initial node
+  routingMatrix: initializeRoutingMatrix(1, initialOutputChannels),
   outputChannels: initialOutputChannels,
   masterGain: initialMasterGain,
 };
 
 function App() {
+  const appInitializationTimeRef = useRef<number>(Date.now());
   const [audioGraph, setAudioGraph] = useState<AudioGraph>(initialGraph);
   const [selectedNodeId, setSelectedNodeId] = useState<NodeId | null>(null);
   const [audioError, setAudioError] = useState<string | null>(null);
@@ -82,36 +82,6 @@ function App() {
   const [audioContextState, setAudioContextState] = useState<AudioContextState | null>(null);
   const [globalParameters, setGlobalParameters] = useState<Record<string, number>>({ chaos: 0 });
   const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [appStatus, setAppStatus] = useState<string>('Initializing application...');
-  const [appWorkletError, setAppWorkletError] = useState<WorkletErrorPayload | null>(null);
-
-  // Memoized callback for when the processor is ready
-  const handleProcessorReadyAppCallback = useCallback(() => {
-    console.log('App.tsx: onProcessorReady callback (from useAudioInitialization) triggered.');
-    // App-specific logic to run after processor is marked ready can go here.
-    // The core setProcessorReady(true) is handled directly by useAudioInitialization.
-  }, []);
-
-  const handleGraphUpdateMessage = useCallback((graph: AudioGraph) => {
-    setAudioGraph(graph);
-  }, [setAudioGraph]);
-
-  const handleParameterUpdateMessage = useCallback(({ nodeId, parameterId, value }: ParameterUpdatePayload) => {
-    setAudioGraph(prevGraph => ({
-      ...prevGraph,
-      nodes: prevGraph.nodes.map(n =>
-        n.id === nodeId
-          ? { ...n, parameters: { ...n.parameters, [parameterId]: value } }
-          : n
-      ),
-    }));
-  }, [setAudioGraph]);
-
-  const handleWorkletErrorMessage = useCallback((error: WorkletErrorPayload) => {
-    console.error('[App] Received WORKLET_ERROR:', error.message);
-    setAppStatus(`Worklet Error: ${error.message}`);
-    setAppWorkletError(error);
-  }, [setAppStatus, setAppWorkletError]); // Added setAppWorkletError
 
   const {
     audioContextRef, // Corrected: was audioContext
@@ -138,6 +108,8 @@ function App() {
     audioContextState,
     workletNodeRef,
     processorReady,
+    audioInitialized,
+    appInitializationTime: appInitializationTimeRef.current, // Pass the ref's current value
   });
 
   // Effect to clear selectedNodeId if it's no longer in the graph
@@ -155,16 +127,16 @@ function App() {
           setAudioError(null);
           console.log('Audio context resumed.');
         } catch (e) {
-          const error = e as Error;
-          console.error('Error resuming audio context:', error);
-          setAudioError(`Failed to resume audio: ${error.message}`);
+          const errorMessage = e instanceof Error ? e.message : String(e);
+          setAudioError(`Error resuming audio: ${errorMessage}`);
+          console.error('Error resuming audio:', e);
         }
       }
     } else {
       console.warn("Attempting to resume audio, but audioContextRef is not yet available.");
       setAudioError('Audio system not initialized, cannot resume.');
     }
-  }, [audioContextRef]);
+  }, [audioContextRef]); // Removed setAudioError from deps as it's set inside
 
   const getNodeById = useCallback((nodeId: NodeId | null): AudioNodeInstance | null => {
     if (!nodeId) return null;
@@ -345,53 +317,55 @@ function App() {
 
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
-      <LayoutShell
-        appHeader={<Header title="Feedbacker" />}
-        transportBar={(
+      <LayoutShell>
+        <Pedalboard>
           <TransportBar
-            audioContextState={audioContextState}
-            onPlayPause={() => { void handlePlayPause(); }}
-            onRecord={handleRecord}
-            chaosValue={globalParameters.chaos * 100} // Scale back to 0-100 for UI
-            onChaosChange={handleChaosChange}
+            isPlaying={audioContextState === 'running'}
             isRecording={isRecording}
+            onPlayPause={handlePlayPause}
+            onRecord={handleRecord}
+            chaosValue={globalParameters.chaos * 100} // Assuming chaos is 0-1 in state, UI wants 0-100
+            onChaosChange={handleChaosChange}
           />
-        )}
-      >
-        <Stack gap="md">
-          <StatusDisplay
-            audioError={audioError} // Use local audioError state
-            audioInitialized={audioInitialized}
-            audioContextState={audioContextState}
-            processorReady={processorReady} // Use local processorReady state
-            initMessageSent={initMessageSent}
-          />
-          <Controls
-            onAddNode={handleAddNode}
-            onAudioResume={() => { void handleResumeAudio(); }}
-            audioContextState={audioContextState}
-          />
-          <ScrollArea style={{ height: 'calc(30vh - 60px)', minHeight: 150 }}>
+          <Stack>
+            <Controls
+              onAddNode={handleAddNode}
+              onAudioResume={() => void handleResumeAudio()} // Ensure void return
+              audioContextState={audioContextState}
+            />
             <NodeList
-              nodes={audioGraph.nodes} // Use nodes from local audioGraph state
-              onSelectNode={handleNodeSelect}
+              nodes={audioGraph.nodes}
               selectedNodeId={selectedNodeId}
-              onRemoveNode={handleRemoveNode} // Pass remove handler
+              onSelectNode={handleNodeSelect} // Corrected: onSelectNode
+              onRemoveNode={handleRemoveNode}
+            />
+          </Stack>
+          <NodeInspector
+            key={selectedNodeInstance?.id} // Ensure re-render on node change
+            selectedNode={selectedNodeInstance} // Corrected: selectedNode
+            onParameterChange={handleParameterChange}
+            onClose={() => { setSelectedNodeId(null); }} // Added braces
+          />
+          <ScrollArea style={{ height: '100%', width: '100%' }}>
+            <MatrixCanvas
+              audioGraph={audioGraph}
+              onMatrixCellClick={handleMatrixCellClick}
             />
           </ScrollArea>
-          {selectedNodeInstance && (
-            <NodeInspector
-              key={selectedNodeInstance.id} // Add key for re-rendering on node change
-              selectedNode={selectedNodeInstance}
-              onParameterChange={handleParameterChange}
-            />
-          )}
-          <Pedalboard>
-            <MatrixCanvas audioGraph={audioGraph} onMatrixCellClick={handleMatrixCellClick} />
-          </Pedalboard>
-        </Stack>
+          <StatusDisplay
+            audioError={audioError}
+            audioInitialized={audioInitialized}
+            audioContextState={audioContextRef.current?.state ?? null}
+            processorReady={processorReady}
+            initMessageSent={initMessageSent}
+          />
+        </Pedalboard>
       </LayoutShell>
-      <LoadingOverlay visible={showLoadingOverlay} overlayProps={{ radius: "sm", blur: 2 }} />
+      <LoadingOverlay
+        visible={showLoadingOverlay}
+        overlayProps={{ radius: 'sm', blur: 2 }}
+        loaderProps={{ children: 'Initializing Audio Engine...' }}
+      />
     </MantineProvider>
   );
 }

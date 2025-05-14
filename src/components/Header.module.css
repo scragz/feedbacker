@@ -1,4 +1,5 @@
 .header {
+  --mantine-font-family-headings: 'Frijole', monospace;
   text-transform: uppercase;
   text-shadow: 6px 6px 0px #444;
   -webkit-text-stroke: 10px #333;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, Group } from '@mantine/core'; // Using Mantine Button
 import classes from './Controls.module.css';
-import type { NodeType } from '../../audio/schema';
+import type { NodeType } from '../audio/schema';
 
 export interface ControlsProps {
   onAddNode: (type: NodeType) => void;
@@ -22,6 +22,12 @@ const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAud
   const addNoiseNode = () => {
     onAddNode('noise');
   };
+  const addOscillatorNode = () => {
+    onAddNode('oscillator');
+  };
+  // const addMicrophoneNode = () => { // ADDED - Placeholder for microphone
+  //   onAddNode('microphone');
+  // };
   return (
     <div className={classes.controlsContainer}>
       {audioContextState === 'suspended' && (
@@ -42,6 +48,12 @@ const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAud
         <Button onClick={addNoiseNode} variant="light">
           Add Noise
         </Button>
+        <Button onClick={addOscillatorNode} variant="light"> {/* ADDED */}
+          Add Oscillator
+        </Button>
+        {/* <Button onClick={addMicrophoneNode} variant="light" disabled> ADDED - Placeholder
+          Add Microphone (WIP)
+        </Button> */}
       </Group>
     </div>
   );

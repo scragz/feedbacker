@@ -70,10 +70,14 @@ export type NodeType =
   | 'gain'
   | 'delay'
   | 'biquad'
-  | 'oscillator' // Example
-  | 'noise' // MODIFIED: Ensured noise is part of the type
+  | 'oscillator' // MODIFIED: Ensured oscillator is part of the type
+  | 'noise'
   | 'input_mixer' // Special node for graph input
-  | 'output_mixer'; // Special node for graph output
+  | 'output_mixer' // Special node for graph output
+  | 'microphone'; // ADDED: Microphone node type
+
+// ADDED: Specific type for oscillator waveforms
+export type OscillatorWaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
 /**
  * Generic structure for defining a parameter of an audio node.
@@ -88,6 +92,7 @@ export interface ParameterDefinition<T = number> {
   currentValue?: T; // Can be set by the UI or processor
   enumValues?: string[]; // For 'enum' type
   unit?: string; // e.g., 'Hz', 'dB', 's'
+  step?: number; // ADDED: Step value for numerical parameters
 }
 
 // Helper type for parameter values
@@ -140,6 +145,8 @@ export interface AudioGraph {
   routingMatrix: RoutingMatrix; // Ensure this is used instead of 'connections'
   outputChannels: number; // Number of output channels for the graph
   masterGain: number; // Overall master gain, ensure this is used instead of 'masterVolume'
+  isMono?: boolean; // ADDED: Flag for mono processing mode
+  chaosLevel?: number; // ADDED: Global chaos level (e.g., 0 to 1)
 }
 
 // === Message Payloads ===
@@ -315,26 +322,29 @@ export type WorkletMessage =
 // This would typically be in its own file or a more structured part of your audio engine code.
 export const NODE_PARAMETER_DEFINITIONS: NodeParameterDefinitions = {
   gain: {
-    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 1, minValue: 0, maxValue: 2, unit: '' },
+    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 1, minValue: 0, maxValue: 2, unit: '', step: 0.01 },
   },
   delay: {
-    delayTime: { id: 'delayTime', label: 'Delay Time', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 2, unit: 's' },
-    feedback: { id: 'feedback', label: 'Feedback', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '' },
+    delayTime: { id: 'delayTime', label: 'Delay Time', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 2, unit: 's', step: 0.01 },
+    feedback: { id: 'feedback', label: 'Feedback', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '', step: 0.01 },
   },
   biquad: {
-    frequency: { id: 'frequency', label: 'Frequency', type: 'float', defaultValue: 1000, minValue: 20, maxValue: 20000, unit: 'Hz' },
-    q: { id: 'q', label: 'Q', type: 'float', defaultValue: 1, minValue: 0.1, maxValue: 20, unit: '' },
+    frequency: { id: 'frequency', label: 'Frequency', type: 'float', defaultValue: 1000, minValue: 20, maxValue: 20000, unit: 'Hz', step: 1 },
+    q: { id: 'q', label: 'Q', type: 'float', defaultValue: 1, minValue: 0.1, maxValue: 20, unit: '', step: 0.1 },
     type: { id: 'type', label: 'Filter Type', type: 'enum', defaultValue: 'lowpass', enumValues: ['lowpass', 'highpass', 'bandpass', 'notch', 'allpass', 'lowshelf', 'highshelf', 'peaking'] },
-    gain: { id: 'gain', label: 'Gain (Shelving/Peaking)', type: 'float', defaultValue: 0, minValue: -24, maxValue: 24, unit: 'dB' },
+    gain: { id: 'gain', label: 'Gain (Shelving/Peaking)', type: 'float', defaultValue: 0, minValue: -24, maxValue: 24, unit: 'dB', step: 0.1 },
   },
-  oscillator: {
-    frequency: { id: 'frequency', label: 'Frequency', type: 'float', defaultValue: 440, minValue: 20, maxValue: 20000, unit: 'Hz' },
-    type: { id: 'type', label: 'Waveform', type: 'enum', defaultValue: 'sine', enumValues: ['sine', 'square', 'sawtooth', 'triangle'] },
-    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.7, minValue: 0, maxValue: 1, unit: '' },
+  oscillator: { // MODIFIED: Was example, now fully defined
+    frequency: { id: 'frequency', label: 'Frequency', type: 'float', defaultValue: 440, minValue: 20, maxValue: 20000, unit: 'Hz', step: 1 },
+    type: { id: 'type', label: 'Waveform', type: 'enum', defaultValue: 'sine' as OscillatorWaveformType, enumValues: ['sine', 'square', 'sawtooth', 'triangle'] },
+    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.7, minValue: 0, maxValue: 1, unit: '', step: 0.01 },
   },
-  noise: { // ADDED: noise type definition
+  noise: {
     type: { id: 'type', label: 'Noise Type', type: 'enum', defaultValue: 'white', enumValues: ['white', 'pink', 'brownian'] },
-    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '' },
+    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 0.5, minValue: 0, maxValue: 1, unit: '', step: 0.01 },
+  },
+  microphone: { // ADDED: Microphone node definition (minimal for now)
+    gain: { id: 'gain', label: 'Gain', type: 'float', defaultValue: 1, minValue: 0, maxValue: 2, unit: '', step: 0.01 },
   },
   input_mixer: { // Input mixer might not have user-configurable params other than channel routing
     masterGain: { id: 'masterGain', label: 'Input Master Gain', type: 'float', defaultValue: 1, minValue: 0, maxValue: 1 }
