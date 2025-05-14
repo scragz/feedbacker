@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { nanoid } from 'nanoid';
 import { MantineProvider, Stack, LoadingOverlay, ScrollArea } from '@mantine/core';
 import { theme } from './theme';
-import Header from './components/Header';
 import Controls from './components/Controls';
 import NodeList from './components/NodeList';
 import NodeInspector from './components/NodeInspector';
@@ -247,6 +246,13 @@ function App() {
 
   const selectedNodeInstance = getNodeById(selectedNodeId);
 
+  console.log('[App.tsx] Evaluating showLoadingOverlay:', {
+    audioInitialized,
+    audioContextState,
+    processorReady,
+    initMessageSent,
+  });
+
   const showLoadingOverlay =
     !audioInitialized ||
     (audioContextState === 'running' &&
@@ -320,9 +326,9 @@ function App() {
       <LayoutShell>
         <Pedalboard>
           <TransportBar
-            isPlaying={audioContextState === 'running'}
+            audioContextState={audioContextState} // Pass audioContextState directly
             isRecording={isRecording}
-            onPlayPause={handlePlayPause}
+            onPlayPause={() => void handlePlayPause()} // Ensure void return for onPlayPause
             onRecord={handleRecord}
             chaosValue={globalParameters.chaos * 100} // Assuming chaos is 0-1 in state, UI wants 0-100
             onChaosChange={handleChaosChange}
