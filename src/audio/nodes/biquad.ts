@@ -1,5 +1,5 @@
 import type { DSPKernel, NodeState } from './dsp-kernel';
-import type { AudioNodeInstance } from '../schema';
+import type { ParameterValue } from '../schema';
 
 // Define Biquad filter types (matches Web Audio API, 'peaking' for 'peakingeq')
 export type BiquadFilterType =
@@ -162,14 +162,14 @@ function calculateCoefficients(
 export const processBiquad: DSPKernel = (
   inputs: Float32Array[],
   outputs: Float32Array[],
-  node: AudioNodeInstance,
-  blockSize: number,
-  sampleRate: number,
-  numChannels: number,
-  nodeStateFromProcessor: NodeState,
+  parameters: Record<string, ParameterValue | undefined>, // Changed from any to ParameterValue | undefined
+  nodeState: NodeState,          // Changed from 'blockSize: number' to 'nodeState'
+  sampleRate: number,            // Changed from 'sampleRate: number' (was 5th, now correctly 5th)
+  blockSize: number,             // Changed from 'numChannels: number' to 'blockSize'
+  numChannels: number,           // Changed from 'nodeStateFromProcessor: NodeState' to 'numChannels'
 ): void => {
-  const state = nodeStateFromProcessor as BiquadNodeState;
-  const params = node.parameters;
+  const state = nodeState as BiquadNodeState; // Use the new 'nodeState' parameter
+  const params = parameters; // Use the new 'parameters' parameter
 
   const typeParam = params.type;
   const type: BiquadFilterType =

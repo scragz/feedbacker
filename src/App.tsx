@@ -336,15 +336,14 @@ function App() {
             <NodeList
               nodes={audioGraph.nodes}
               selectedNodeId={selectedNodeId}
-              onSelectNode={handleNodeSelect} // Corrected: onSelectNode
+              onSelectNode={handleNodeSelect}
               onRemoveNode={handleRemoveNode}
             />
           </Stack>
           <NodeInspector
             key={selectedNodeInstance?.id} // Ensure re-render on node change
-            selectedNode={selectedNodeInstance} // Corrected: selectedNode
+            selectedNode={selectedNodeInstance}
             onParameterChange={handleParameterChange}
-            onClose={() => { setSelectedNodeId(null); }} // Added braces
           />
           <ScrollArea style={{ height: '100%', width: '100%' }}>
             <MatrixCanvas
