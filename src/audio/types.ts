@@ -5,14 +5,18 @@
  */
 
 // Declare the global AudioWorklet types
+// These types augment the standard DOM types to add missing or custom functionality
 declare global {
-  interface AudioWorkletGlobalScope {
-    readonly sampleRate: number;
-    readonly currentTime: number;
-    readonly currentFrame: number;
+  // Note: AudioWorkletGlobalScope is already declared in global.d.ts
+  // We only add MFNProcessor specific types here
+
+  interface MFNProcessorOptions {
+    sampleRate?: number;
+    maxChannels?: number;
+    [key: string]: unknown;
   }
 
-  // Define the base AudioWorkletProcessor interface
+  // Define the base AudioWorkletProcessor interface if not already defined elsewhere
   interface AudioWorkletProcessor {
     readonly port: MessagePort;
     process(
@@ -22,33 +26,9 @@ declare global {
     ): boolean;
   }
 
-  // Define the constructor signature for an AudioWorkletProcessor
-  const AudioWorkletProcessor: {
-    prototype: AudioWorkletProcessor;
-    new (options?: AudioWorkletNodeOptions): AudioWorkletProcessor;
-  };
+  // AudioWorkletProcessor constructor is defined in global.d.ts
 
-  // Define the AudioWorkletNodeOptions interface
-  interface AudioWorkletNodeOptions {
-    numberOfInputs?: number;
-    numberOfOutputs?: number;
-    outputChannelCount?: number[];
-    processorOptions?: {
-      sampleRate?: number;
-      maxChannels?: number;
-      [key: string]: unknown;
-    };
-    [key: string]: unknown;
-  }
-
-  // Global registerProcessor function
-  function registerProcessor(
-    name: string,
-    processorCtor: new (options?: AudioWorkletNodeOptions) => AudioWorkletProcessor
-  ): void;
-
-  // Make AudioWorkletGlobalScope available as a property of globalThis
-  var AudioWorkletGlobalScope: AudioWorkletGlobalScope | undefined;
+  // registerProcessor is defined in global.d.ts
 }
 
 export {};

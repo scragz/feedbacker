@@ -39,8 +39,8 @@ export const Knob: React.FC<KnobProps> = ({
   bgcolor = "#000",
   className = "",
   onChange,
-  sprites,
-  src,
+  sprites = 31,
+  src = "/assets/images/knob.png",
   label,
   size = 'medium',
   disabled = false

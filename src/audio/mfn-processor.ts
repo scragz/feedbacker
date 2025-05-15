@@ -3,7 +3,9 @@
  * AudioWorkletProcessor for the Multichannel Feedback Network.
  */
 
-import './types'; // Import our custom type definitions
+import './types';
+// Import the global declarations for AudioWorklet scope
+import './mfn-globals.d';
 
 import {
   type AudioGraph,
@@ -29,6 +31,17 @@ import { passthroughKernel } from './nodes/passthrough';
 import { LFOProcessor } from './nodes/lfo';
 import { EnvelopeFollower } from './nodes/envelope-follower';
 
+// Make TypeScript aware of the global variables
+declare const AudioWorkletProcessor: {
+  prototype: AudioWorkletProcessor;
+  new (options?: AudioWorkletNodeOptions): AudioWorkletProcessor;
+};
+
+declare function registerProcessor(
+  name: string,
+  processorCtor: new (options?: AudioWorkletNodeOptions) => AudioWorkletProcessor
+): void;
+
 const DEFAULT_BLOCK_SIZE = 128;
 const DEFAULT_OUTPUT_CHANNELS = 2;
 
@@ -39,7 +52,9 @@ class MfnProcessor extends AudioWorkletProcessor {
   private previousKernelOutputBuffers: Map<NodeId, Float32Array[]> = new Map<NodeId, Float32Array[]>();
   private nodeOrder: NodeId[] = [];
 
-  private sampleRateInternal = globalThis.AudioWorkletGlobalScope?.sampleRate ?? 44100;
+  // Access the sampleRate directly as it's available in the AudioWorklet scope
+  // We know sampleRate exists in the AudioWorklet context
+  private sampleRateInternal = 44100;
   private maxOutputChannels = DEFAULT_OUTPUT_CHANNELS;
   private chaosValue = 0; // Added internal state for chaos
 
@@ -48,6 +63,10 @@ class MfnProcessor extends AudioWorkletProcessor {
   private lfo2: LFOProcessor;
   private envelopeFollower1: EnvelopeFollower;
   private envelopeFollower2: EnvelopeFollower;
+
+  // Store current LFO values for each processing block
+  private lfo1Value = 0;
+  private lfo2Value = 0;
 
   private currentBlockOutputChannels = DEFAULT_OUTPUT_CHANNELS;
   private currentBlockSize = DEFAULT_BLOCK_SIZE;
@@ -59,10 +78,19 @@ class MfnProcessor extends AudioWorkletProcessor {
 
   constructor(options?: AudioWorkletNodeOptions) {
     super(options);
+
+    // Initialize sampleRateInternal from the global sampleRate available in AudioWorklet scope
+    // TypeScript won't recognize this in class fields, but it exists at runtime
+    this.sampleRateInternal = sampleRate;
+
     if (options?.processorOptions) {
-      const processorOpts = options.processorOptions as Record<string, unknown>;
-      this.sampleRateInternal = (processorOpts.sampleRate as number) ?? this.sampleRateInternal;
-      this.maxOutputChannels = (processorOpts.maxChannels as number) ?? this.maxOutputChannels;
+      const processorOpts = options.processorOptions as MFNProcessorOptions;
+      if (processorOpts.sampleRate !== undefined) {
+        this.sampleRateInternal = processorOpts.sampleRate;
+      }
+      if (processorOpts.maxChannels !== undefined) {
+        this.maxOutputChannels = processorOpts.maxChannels;
+      }
     }
 
     // Initialize global LFOs and envelope followers
@@ -440,8 +468,8 @@ class MfnProcessor extends AudioWorkletProcessor {
     }
 
     // Get current modulator values
-    const lfo1Value = this.lfo1.getCurrentValue();
-    const lfo2Value = this.lfo2.getCurrentValue();
+    const lfo1Value = this.lfo1Value;
+    const lfo2Value = this.lfo2Value;
     const env1Value = this.envelopeFollower1.getCurrentValue();
     const env2Value = this.envelopeFollower2.getCurrentValue();
 
@@ -451,13 +479,18 @@ class MfnProcessor extends AudioWorkletProcessor {
       const originalValue = node.parameters[paramId];
       const paramDef = nodeParamDefs[paramId];
 
-      // Base amount is the parameter value
+      // Skip if not a numeric parameter
+      if (typeof originalValue !== 'number') continue;
+      // Skip if no parameter definition exists
+      if (paramDef === undefined) continue;
+
+      // Base amount is the parameter value (already checked that it's a number)
       const baseValue = originalValue;
       let totalModulation = 0;
 
       // Calculate the modulation range based on parameter definition
-      const minValue = paramDef.minValue ?? 0;
-      const maxValue = paramDef.maxValue ?? 1;
+      const minValue = typeof paramDef.minValue === 'number' ? paramDef.minValue : 0;
+      const maxValue = typeof paramDef.maxValue === 'number' ? paramDef.maxValue : 1;
       const range = maxValue - minValue;
 
       // Calculate chaos-scaled modulation for each source
@@ -642,32 +675,29 @@ class MfnProcessor extends AudioWorkletProcessor {
       if (this.envelopeFollower1.isEnabled() && this.envelopeFollower1.isForSource(destNodeId)) {
         // Use the first channel of mixed inputs as the envelope source
         for (let s = 0; s < this.currentBlockSize; s++) {
-          if (mixedInputsForDestNode[0]?.[s] !== undefined) {
-            this.envelopeFollower1.process(Math.abs(mixedInputsForDestNode[0][s]));
-          }
+          this.envelopeFollower1.process(Math.abs(mixedInputsForDestNode[0][s]));
         }
       }
 
       if (this.envelopeFollower2.isEnabled() && this.envelopeFollower2.isForSource(destNodeId)) {
         // Use the first channel of mixed inputs as the envelope source
         for (let s = 0; s < this.currentBlockSize; s++) {
-          if (mixedInputsForDestNode[0]?.[s] !== undefined) {
-            this.envelopeFollower2.process(Math.abs(mixedInputsForDestNode[0][s]));
-          }
+          this.envelopeFollower2.process(Math.abs(mixedInputsForDestNode[0][s]));
         }
       }
 
       // Get parameter definitions for this node type
       const nodeType = destNode.type;
-      const paramDefs = NODE_PARAMETER_DEFINITIONS[nodeType] ?? {};
+      const paramDefs = NODE_PARAMETER_DEFINITIONS[nodeType];
 
-      // Calculate modulated parameters if node has modulation
-      const modulatedParams = (destNode.modulation && Object.keys(destNode.modulation).length > 0) || this.chaosValue > 0
+      // Calculate modulated parameters for this node if needed
+      const hasModulation = destNode.modulation && Object.keys(destNode.modulation).length > 0;
+      const modulatedParams = (hasModulation || this.chaosValue > 0)
         ? this._calculateModulatedParameters(destNode, paramDefs)
         : destNode.parameters;
 
       const kernelSpecificOutputs = currentKernelOutputBuffers.get(destNodeId);
-      if (!kernelSpecificOutputs) {
+      if (kernelSpecificOutputs === undefined) {
         // This should ideally not happen if currentKernelOutputBuffers is populated correctly for all nodes
         if (this.logCounter % (this.logThrottle * 10) === 0) {
             console.warn(`[MFNProcessor process] Missing currentKernelOutputBuffers for node ${destNodeId}. Skipping kernel processing for this node.`);
