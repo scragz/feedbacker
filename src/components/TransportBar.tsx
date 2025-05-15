@@ -1,7 +1,8 @@
 import { ActionIcon, Button, Group, Text, Tooltip } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerStop, IconPlayerRecord, IconMoodCrazyHappy, IconVolume, IconVolumeOff } from '@tabler/icons-react';
 import classes from './TransportBar.module.css';
-import { Knob, Switch } from './InputControls';
+import { Knob } from './InputControls/Knob';
+import { Switch } from './InputControls/Switch';
 
 interface TransportBarProps {
   audioContextState: AudioContextState | null;
@@ -88,7 +89,7 @@ export function TransportBar({
               onChange={onChaosChange}
               color={getChaosColor(chaosValue)}
               bgcolor="#222"
-              size="medium"
+              variant="medium"
               label={`${chaosValue}%`}
             />
           </div>

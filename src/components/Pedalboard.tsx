@@ -1,4 +1,5 @@
 import React from 'react';
+import { Stack } from '@mantine/core';
 import classes from './Pedalboard.module.css';
 
 interface PedalboardProps {
@@ -7,9 +8,9 @@ interface PedalboardProps {
 
 const Pedalboard: React.FC<PedalboardProps> = ({ children, ...props }) => {
   return (
-    <div className={classes.pedalboard} {...props}>
+    <Stack className={classes.pedalboard} {...props}>
       {children} {/* Render children if provided */}
-    </div>
+    </Stack>
   );
 };
 

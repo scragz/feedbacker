@@ -1,7 +1,8 @@
 import { Box, Flex, Group, Select, Text, Tooltip } from '@mantine/core';
 import { IconWaveSine, IconWaveSquare, IconWaveSawTool } from '@tabler/icons-react';
 import type { LFOWaveformType } from '../audio/schema';
-import { Knob, Switch } from './InputControls';
+import { Knob } from './InputControls/Knob';
+import { Switch } from './InputControls/Switch';
 import classes from './ModulationPanel.module.css';
 
 interface ModulationPanelProps {
@@ -97,6 +98,7 @@ export function ModulationPanel({
               checked={lfo1.enabled}
               onChange={(checked) => { onLFOChange(1, 'enabled', checked) }}
               label="Enabled"
+              variant="led"
             />
           </Flex>
 
@@ -123,7 +125,7 @@ export function ModulationPanel({
                 onChange={(value) => { onLFOChange(1, 'frequency', value) }}
                 color="#5af"
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${value.toFixed(1)} Hz`}
               />
               <Text size="xs" ta="center" mt={5}>Frequency</Text>
@@ -138,7 +140,7 @@ export function ModulationPanel({
                 onChange={(value) => { onLFOChange(1, 'amount', value) }}
                 color={lfo1.amount >= 0 ? "#5af" : "#f5a"}
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
               />
               <Text size="xs" ta="center" mt={5}>Amount</Text>
@@ -181,7 +183,7 @@ export function ModulationPanel({
                 onChange={(value) => { onLFOChange(2, 'frequency', value) }}
                 color="#5af"
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${value.toFixed(2)} Hz`}
               />
               <Text size="xs" ta="center" mt={5}>Frequency</Text>
@@ -196,7 +198,7 @@ export function ModulationPanel({
                 onChange={(value) => { onLFOChange(2, 'amount', value) }}
                 color={lfo2.amount >= 0 ? "#5af" : "#f5a"}
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
               />
               <Text size="xs" ta="center" mt={5}>Amount</Text>
@@ -241,7 +243,7 @@ export function ModulationPanel({
                 onChange={(value) => { onEnvChange(1, 'attack', value) }}
                 color="#5af"
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${(value * 1000).toFixed(0)} ms`}
               />
               <Text size="xs" ta="center" mt={5}>Attack</Text>
@@ -256,7 +258,7 @@ export function ModulationPanel({
                 onChange={(value) => { onEnvChange(1, 'release', value) }}
                 color="#5af"
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${(value * 1000).toFixed(0)} ms`}
               />
               <Text size="xs" ta="center" mt={5}>Release</Text>
@@ -273,7 +275,7 @@ export function ModulationPanel({
                 onChange={(value) => { onEnvChange(1, 'amount', value) }}
                 color={env1.amount >= 0 ? "#5af" : "#f5a"}
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
               />
               <Text size="xs" ta="center" mt={5}>Amount</Text>
@@ -318,7 +320,7 @@ export function ModulationPanel({
                 onChange={(value) => { onEnvChange(2, 'attack', value) }}
                 color="#5af"
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${(value * 1000).toFixed(0)} ms`}
               />
               <Text size="xs" ta="center" mt={5}>Attack</Text>
@@ -333,7 +335,7 @@ export function ModulationPanel({
                 onChange={(value) => { onEnvChange(2, 'release', value) }}
                 color="#5af"
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${(value * 1000).toFixed(0)} ms`}
               />
               <Text size="xs" ta="center" mt={5}>Release</Text>
@@ -350,7 +352,7 @@ export function ModulationPanel({
                 onChange={(value) => { onEnvChange(2, 'amount', value) }}
                 color={env2.amount >= 0 ? "#5af" : "#f5a"}
                 bgcolor="#222"
-                size="medium"
+                variant="small"
                 label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
               />
               <Text size="xs" ta="center" mt={5}>Amount</Text>
@@ -374,7 +376,7 @@ export function ModulationPanel({
               onChange={onChaosChange}
               color={getChaosColor(chaosValue)}
               bgcolor="#222"
-              size="large"
+              variant="small"
               label={(value) => `${value}%`}
             />
           </div>

@@ -1,6 +1,6 @@
-import { Button, Group, Tooltip, Text } from '@mantine/core';
+import { Button, Tooltip, Text } from '@mantine/core';
 import { type ButtonProps } from '@mantine/core';
-import { Knob } from './InputControls';
+import { Knob } from './InputControls/Knob';
 import classes from './ModulationButton.module.css';
 
 interface ModulationButtonProps extends Omit<ButtonProps, 'onChange'> {
@@ -61,8 +61,7 @@ export function ModulationButton({
             onChange={onAmountChange}
             color={active ? (amount >= 0 ? color : 'pink') : '#555'}
             bgcolor="#222"
-            size="small"
-            diameter={32}
+            variant="small"
             label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
             disabled={!active || disabled}
           />

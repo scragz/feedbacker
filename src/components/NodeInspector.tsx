@@ -8,7 +8,8 @@ import {
 } from '../audio/schema';
 import { ModulationButtonGroup } from './ModulationButton';
 import classes from './NodeInspector.module.css';
-import { Knob, Switch } from './InputControls';
+import { Knob } from './InputControls/Knob';
+import { Switch } from './InputControls/Switch';
 
 interface NodeInspectorProps {
   selectedNode: AudioNodeInstance | null;
@@ -62,7 +63,7 @@ export function NodeInspector({
           const isMainParameter = MAIN_PARAMETERS.includes(paramId);
 
           // Choose the knob size based on parameter importance
-          const knobSize = isMainParameter ? 'large' : 'medium';
+          const knobVariant = isMainParameter ? 'medium' : 'small';
 
           // Set knob colors based on parameter type
           const knobColor = isMainParameter ? '#f55' : '#5af';
@@ -95,7 +96,7 @@ export function NodeInspector({
                     }}
                     color={knobColor}
                     bgcolor="#222"
-                    size={knobSize}
+                    variant={isMainParameter ? 'medium' : 'small'}
                     label={(value) => {
                       // Apply appropriate formatting based on parameter definition
                       let formattedValue = '';
@@ -122,6 +123,7 @@ export function NodeInspector({
                   onChange={(checked) => {
                     onParameterChange(selectedNode.id, paramId, checked);
                   }}
+                  variant="led"
                   label={paramDef.label}
                 />
               ) : (

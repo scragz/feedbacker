@@ -118,7 +118,6 @@ function App() {
   });
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isMono, setIsMono] = useState<boolean>(true); // Default to mono mode
-  const [showModulationSettings, setShowModulationSettings] = useState<boolean>(false);
 
   const {
     audioContextRef, // Corrected: was audioContext
@@ -536,21 +535,54 @@ function App() {
             onChaosChange={handleChaosChange}
             isMono={isMono}
             onMonoToggle={handleMonoToggle}
-            onOpenModulationSettings={() => { setShowModulationSettings(true); }}
           />
-          <Stack>
-            <Controls
-              onAddNode={handleAddNode}
-              onAudioResume={() => void handleResumeAudio()} // Ensure void return
-              audioContextState={audioContextState}
-            />
-            <NodeList
-              nodes={audioGraph.nodes}
-              selectedNodeId={selectedNodeId}
-              onSelectNode={handleNodeSelect}
-              onRemoveNode={handleRemoveNode}
-            />
-          </Stack>
+          <ModulationPanel
+            lfo1={audioGraph.lfo1 ?? {
+              enabled: false,
+              frequency: 1.0,
+              waveform: 'sine',
+              amount: 0,
+            }}
+            lfo2={audioGraph.lfo2 ?? {
+              enabled: false,
+              frequency: 0.5,
+              waveform: 'triangle',
+              amount: 0,
+            }}
+            env1={audioGraph.envelopeFollower1 ?? {
+              enabled: false,
+              attack: 0.01,
+              release: 0.1,
+              amount: 0,
+              source: null,
+            }}
+            env2={audioGraph.envelopeFollower2 ?? {
+              enabled: false,
+              attack: 0.05,
+              release: 0.5,
+              amount: 0,
+              source: null,
+            }}
+            availableNodeIds={audioGraph.nodes.map(node => ({
+              id: node.id,
+              label: node.label ?? node.type
+            }))}
+            chaosValue={globalParameters.chaos * 100}
+            onLFOChange={handleLFOParameterChange}
+            onEnvChange={handleEnvelopeFollowerChange}
+            onChaosChange={handleChaosChange}
+          />
+          <Controls
+            onAddNode={handleAddNode}
+            onAudioResume={() => void handleResumeAudio()} // Ensure void return
+            audioContextState={audioContextState}
+          />
+          <NodeList
+            nodes={audioGraph.nodes}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={handleNodeSelect}
+            onRemoveNode={handleRemoveNode}
+          />
           <NodeInspector
             key={selectedNodeInstance?.id} // Ensure re-render on node change
             selectedNode={selectedNodeInstance}
@@ -572,49 +604,6 @@ function App() {
         overlayProps={{ radius: 'sm', blur: 2 }}
         loaderProps={{ children: 'Initializing Audio Engine...' }}
       />
-      <Modal
-        opened={showModulationSettings}
-        onClose={() => { setShowModulationSettings(false); }}
-        title="Global Modulation Settings"
-        size="xl"
-      >
-        <ModulationPanel
-          lfo1={audioGraph.lfo1 ?? {
-            enabled: false,
-            frequency: 1.0,
-            waveform: 'sine',
-            amount: 0,
-          }}
-          lfo2={audioGraph.lfo2 ?? {
-            enabled: false,
-            frequency: 0.5,
-            waveform: 'triangle',
-            amount: 0,
-          }}
-          env1={audioGraph.envelopeFollower1 ?? {
-            enabled: false,
-            attack: 0.01,
-            release: 0.1,
-            amount: 0,
-            source: null,
-          }}
-          env2={audioGraph.envelopeFollower2 ?? {
-            enabled: false,
-            attack: 0.05,
-            release: 0.5,
-            amount: 0,
-            source: null,
-          }}
-          availableNodeIds={audioGraph.nodes.map(node => ({
-            id: node.id,
-            label: node.label ?? node.type
-          }))}
-          chaosValue={globalParameters.chaos * 100}
-          onLFOChange={handleLFOParameterChange}
-          onEnvChange={handleEnvelopeFollowerChange}
-          onChaosChange={handleChaosChange}
-        />
-      </Modal>
     </MantineProvider>
   );
 }
