@@ -1,7 +1,7 @@
 import { ActionIcon, Button, Group, Text, Tooltip } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerStop, IconPlayerRecord, IconMoodCrazyHappy, IconVolume, IconVolumeOff, IconSettings } from '@tabler/icons-react';
 import classes from './TransportBar.module.css';
-import { Knob, Switch } from './controls/InputControls';
+import { Knob, Switch } from './InputControls';
 
 interface TransportBarProps {
   audioContextState: AudioContextState | null;
@@ -96,9 +96,6 @@ export function TransportBar({
       </Group>
     </Group>
   );
-}
-
-export default TransportBar;
 }
 
 export default TransportBar;

@@ -1,7 +1,7 @@
 import { Box, Flex, Group, Select, Text, Tooltip } from '@mantine/core';
 import { IconWaveSine, IconWaveSquare, IconWaveSawTool } from '@tabler/icons-react';
 import type { LFOWaveformType } from '../audio/schema';
-import { Knob, Switch } from './controls/InputControls';
+import { Knob, Switch } from './InputControls';
 import classes from './ModulationPanel.module.css';
 
 interface ModulationPanelProps {

@@ -8,7 +8,7 @@ import {
 } from '../audio/schema';
 import { ModulationButtonGroup } from './ModulationButton';
 import classes from './NodeInspector.module.css';
-import { Knob, Switch } from './controls/InputControls';
+import { Knob, Switch } from './InputControls';
 
 interface NodeInspectorProps {
   selectedNode: AudioNodeInstance | null;
@@ -139,9 +139,5 @@ export function NodeInspector({
     </Box>
   );
 }
-
-export default NodeInspector;
-
-export default NodeInspector;
 
 export default NodeInspector;

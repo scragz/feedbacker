@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, ChangeEvent } from 'react';
+import React, { useRef, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 import '../lib/inputKnobs.js';
 import './InputControls.module.css';
 

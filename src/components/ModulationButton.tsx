@@ -1,6 +1,6 @@
 import { Button, Group, Tooltip, Text } from '@mantine/core';
 import { type ButtonProps } from '@mantine/core';
-import { Knob } from './controls/InputControls';
+import { Knob } from './InputControls';
 import classes from './ModulationButton.module.css';
 
 interface ModulationButtonProps extends Omit<ButtonProps, 'onChange'> {
@@ -150,17 +150,6 @@ export function ModulationButtonGroup({
         onChange={(active) => { onModulationChange(parameter, 'env2', active, env2Amount) }}
       />
     </div>
-  );
-}
-      <ModulationButton
-        label="ENV2"
-        active={env2Active}
-        color="green"
-        size="xs"
-        disabled={disabled}
-        onChange={(active) => { onModulationChange(parameter, 'env2', active, modulation?.env2?.amount ?? 0.5) }}
-      />
-    </Group>
   );
 }
 
