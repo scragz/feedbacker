@@ -75,7 +75,13 @@ export type NodeType =
   | 'waveshaper' // ADDED: Waveshaper node type
   | 'input_mixer' // Special node for graph input
   | 'output_mixer' // Special node for graph output
-  | 'microphone'; // Microphone node type
+  | 'microphone' // Microphone node type
+  // | 'convolver' // ConvolverNode for reverb/IR processing
+  // | 'compressor' // DynamicsCompressorNode for compression
+  // | 'chorus' // Custom Chorus effect
+  // | 'flanger' // Custom Flanger effect
+  // | 'phaser' // Custom Phaser effect
+  // | 'iir'; // IIRFilterNode for custom filter responses
 
 // ADDED: Specific type for oscillator waveforms
 export type OscillatorWaveformType = 'sine' | 'square' | 'sawtooth' | 'triangle';

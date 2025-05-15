@@ -63,11 +63,11 @@ export class LFOProcessor {
   private enabled: boolean;
 
   constructor(
-    frequency: number = 1,
+    frequency = 1,
     waveform: LFOWaveformType = 'sine',
-    amount: number = 1,
-    sampleRate: number = 44100,
-    enabled: boolean = false
+    amount = 0,
+    sampleRate = 44100,
+    enabled = false
   ) {
     this.frequency = frequency;
     this.waveform = waveform;

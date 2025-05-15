@@ -3,19 +3,19 @@
  * Simple envelope follower with configurable attack and release times
  */
 export class EnvelopeFollower {
-  private envelope: number = 0;
-  private attackCoeff: number = 0;
-  private releaseCoeff: number = 0;
-  private amount: number = 1;
-  private enabled: boolean = false;
+  private envelope = 0;
+  private attackCoeff = 0;
+  private releaseCoeff = 0;
+  private amount = 0;
+  private enabled = false;
   private source: string | null = null;
 
   constructor(
-    attack: number = 0.01, // attack time in seconds
-    release: number = 0.1, // release time in seconds
-    amount: number = 1,
-    sampleRate: number = 44100,
-    enabled: boolean = false,
+    attack = 0.01, // attack time in seconds
+    release = 0.1, // release time in seconds
+    amount = 0,
+    sampleRate = 44100,
+    enabled = false,
     source: string | null = null
   ) {
     this.setAttackTime(attack, sampleRate);

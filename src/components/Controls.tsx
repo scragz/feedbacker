@@ -32,9 +32,6 @@ const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAud
     throw new Error('Function not implemented.');
   }
 
-  // const addMicrophoneNode = () => { // ADDED - Placeholder for microphone
-  //   onAddNode('microphone');
-  // };
   return (
     <div className={classes.controlsContainer}>
       {audioContextState === 'suspended' && (

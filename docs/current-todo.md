@@ -1,14 +1,6 @@
-- osc and biquad freq should go lower. maybe this slider should be log?
-- more node types
-  1. WaveshaperNode
-  2. ConvolverNode
-  3. DynamicsCompressorNode
-  4. Chorus/Flanger/Phaser
-  5. IIRFilterNode
+- knobs don't update the value label
+- more node types 2. ConvolverNode 3. DynamicsCompressorNode 4. Chorus/Flanger/Phaser 5. IIRFilterNode
 - the add node buttons need to wrap since there will be more than can fit in one row
-- mono mode (this should have the grid be just one channel and then split the output to stereo, mono should be the default, put the switch in the transport bar)
-- we need to beef up the modulation.
-  - we want to have two global LFOs
-  - we want to have the envelope followers
-  - every numeric parameter should have little buttons to enable LFO1 LFO2, ENV1, ENV2 along with a small knob to control amount
-- chaos needs to be a scaling factor for a bunch of params across current nodes. any available LFO values should be scaled up. filter q, delay feedback. chaos needs LFO knobs on itself as well.
+- finish modulation
+  - we have two global LFOs and evelope followers that need a panel to adjust the rate and depth for lfo and the envelope follower source for the envelope followers
+- chaos needs to be a scaling factor for a bunch of params across current nodes. any available LFO values should be scaled up. filter q, delay feedback. chaos needs LFO knobs on itself as well. chaos should be moved to the new global modulation panel

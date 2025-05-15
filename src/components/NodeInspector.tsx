@@ -70,7 +70,7 @@ export function NodeInspector({
           return (
             <Box key={paramId} className={classes.parameterControl}>
               <Text size="sm" fw={500} mb={4}>
-                {paramDef.label ?? paramId}
+                {paramDef.label}
               </Text>
               {paramDef.type === 'enum' && paramDef.enumValues ? (
                 <Select
@@ -96,12 +96,24 @@ export function NodeInspector({
                     color={knobColor}
                     bgcolor="#222"
                     size={knobSize}
-                    label={
-                      `${typeof currentValue === 'number'
-                        ? currentValue.toFixed(paramDef.type === 'integer' ? 0 :
-                          (paramDef.unit === '%' || paramDef.unit === 'dB' ? 1 : 2))
-                        : currentValue}${paramDef.unit ?? ''}`
-                    }
+                    label={(value) => {
+                      // Apply appropriate formatting based on parameter definition
+                      let formattedValue = '';
+                      if (typeof value === 'number') {
+                        if (paramDef.type === 'integer') {
+                          formattedValue = value.toFixed(0);
+                        } else if (paramDef.unit === '%' || paramDef.unit === 'dB') {
+                          formattedValue = value.toFixed(1);
+                        } else {
+                          formattedValue = value.toFixed(2);
+                        }
+                      } else {
+                        formattedValue = String(value);
+                      }
+                      // Add unit if available
+                      const unit = paramDef.unit ??  '';
+                      return `${formattedValue}${unit}`;
+                    }}
                   />
                 </div>
               ) : paramDef.type === 'boolean' ? (
@@ -110,7 +122,7 @@ export function NodeInspector({
                   onChange={(checked) => {
                     onParameterChange(selectedNode.id, paramId, checked);
                   }}
-                  label={paramDef.label ?? paramId}
+                  label={paramDef.label}
                 />
               ) : (
                 <Text size="xs" c="dimmed" mt={2}>

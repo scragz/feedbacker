@@ -17,8 +17,24 @@ interface ModulationPanelProps {
     waveform: LFOWaveformType;
     amount: number;
   };
+  env1?: {
+    enabled: boolean;
+    attack: number;
+    release: number;
+    amount: number;
+    source: string | null;
+  };
+  env2?: {
+    enabled: boolean;
+    attack: number;
+    release: number;
+    amount: number;
+    source: string | null;
+  };
   chaosValue: number;
+  availableNodeIds?: { id: string; label: string }[];
   onLFOChange: (lfoNumber: 1 | 2, paramName: string, value: number | string | boolean) => void;
+  onEnvChange?: (envNumber: 1 | 2, paramName: string, value: number | string | boolean | null) => void;
   onChaosChange: (value: number) => void;
 }
 
@@ -33,8 +49,24 @@ const waveformIcons = {
 export function ModulationPanel({
   lfo1,
   lfo2,
+  env1 = {
+    enabled: false,
+    attack: 0.01,
+    release: 0.1,
+    amount: 0,
+    source: null
+  },
+  env2 = {
+    enabled: false,
+    attack: 0.05,
+    release: 0.5,
+    amount: 0,
+    source: null
+  },
   chaosValue,
+  availableNodeIds = [],
   onLFOChange,
+  onEnvChange = () => null,
   onChaosChange
 }: ModulationPanelProps) {
   const waveformOptions = [
@@ -92,24 +124,25 @@ export function ModulationPanel({
                 color="#5af"
                 bgcolor="#222"
                 size="medium"
-                label={`${lfo1.frequency.toFixed(1)} Hz`}
+                label={(value) => `${value.toFixed(1)} Hz`}
               />
               <Text size="xs" ta="center" mt={5}>Frequency</Text>
             </div>
 
             <div className={classes.knobColumn}>
               <Knob
-                min={0}
+                min={-1}
                 max={1}
                 step={0.01}
                 value={lfo1.amount}
                 onChange={(value) => { onLFOChange(1, 'amount', value) }}
-                color="#5af"
+                color={lfo1.amount >= 0 ? "#5af" : "#f5a"}
                 bgcolor="#222"
                 size="medium"
-                label={`${Math.round(lfo1.amount * 100)}%`}
+                label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
               />
               <Text size="xs" ta="center" mt={5}>Amount</Text>
+              <Text size="xs" c="dimmed" ta="center">+ up / - down</Text>
             </div>
           </div>
         </Box>
@@ -149,24 +182,179 @@ export function ModulationPanel({
                 color="#5af"
                 bgcolor="#222"
                 size="medium"
-                label={`${lfo2.frequency.toFixed(2)} Hz`}
+                label={(value) => `${value.toFixed(2)} Hz`}
               />
               <Text size="xs" ta="center" mt={5}>Frequency</Text>
             </div>
 
             <div className={classes.knobColumn}>
               <Knob
-                min={0}
+                min={-1}
                 max={1}
                 step={0.01}
                 value={lfo2.amount}
                 onChange={(value) => { onLFOChange(2, 'amount', value) }}
+                color={lfo2.amount >= 0 ? "#5af" : "#f5a"}
+                bgcolor="#222"
+                size="medium"
+                label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
+              />
+              <Text size="xs" ta="center" mt={5}>Amount</Text>
+              <Text size="xs" c="dimmed" ta="center">+ up / - down</Text>
+            </div>
+          </div>
+        </Box>
+
+        {/* Envelope Follower 1 Controls */}
+        <Box style={{ flex: 1, minWidth: '220px' }} className={classes.lfoSection}>
+          <Flex justify="space-between" align="center" mb="xs">
+            <Text fw={500}>ENV 1</Text>
+            <Switch
+              checked={env1.enabled}
+              onChange={(checked) => { onEnvChange(1, 'enabled', checked) }}
+              label="Enabled"
+            />
+          </Flex>
+
+          <Flex mb="xs">
+            <Text size="sm" style={{ width: '80px' }}>Source:</Text>
+            <Select
+              size="xs"
+              data={[{value: 'none', label: 'None'}, ...availableNodeIds.map(node => ({
+                value: node.id,
+                label: node.label || node.id
+              }))]}
+              value={env1.source ?? 'none'}
+              onChange={(value) => { onEnvChange(1, 'source', value === 'none' ? null : value) }}
+              disabled={!env1.enabled}
+              style={{ flex: 1 }}
+            />
+          </Flex>
+
+          <div className={classes.knobsRow}>
+            <div className={classes.knobColumn}>
+              <Knob
+                min={0.001}
+                max={1}
+                step={0.001}
+                value={env1.attack}
+                onChange={(value) => { onEnvChange(1, 'attack', value) }}
                 color="#5af"
                 bgcolor="#222"
                 size="medium"
-                label={`${Math.round(lfo2.amount * 100)}%`}
+                label={(value) => `${(value * 1000).toFixed(0)} ms`}
+              />
+              <Text size="xs" ta="center" mt={5}>Attack</Text>
+            </div>
+
+            <div className={classes.knobColumn}>
+              <Knob
+                min={0.001}
+                max={2}
+                step={0.001}
+                value={env1.release}
+                onChange={(value) => { onEnvChange(1, 'release', value) }}
+                color="#5af"
+                bgcolor="#222"
+                size="medium"
+                label={(value) => `${(value * 1000).toFixed(0)} ms`}
+              />
+              <Text size="xs" ta="center" mt={5}>Release</Text>
+            </div>
+          </div>
+
+          <div className={classes.knobsRow} style={{marginTop: '10px'}}>
+            <div className={classes.knobColumn} style={{width: '100%'}}>
+              <Knob
+                min={-1}
+                max={1}
+                step={0.01}
+                value={env1.amount}
+                onChange={(value) => { onEnvChange(1, 'amount', value) }}
+                color={env1.amount >= 0 ? "#5af" : "#f5a"}
+                bgcolor="#222"
+                size="medium"
+                label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
               />
               <Text size="xs" ta="center" mt={5}>Amount</Text>
+              <Text size="xs" c="dimmed" ta="center">+ up / - down</Text>
+            </div>
+          </div>
+        </Box>
+
+        {/* Envelope Follower 2 Controls */}
+        <Box style={{ flex: 1, minWidth: '220px' }} className={classes.lfoSection}>
+          <Flex justify="space-between" align="center" mb="xs">
+            <Text fw={500}>ENV 2</Text>
+            <Switch
+              checked={env2.enabled}
+              onChange={(checked) => { onEnvChange(2, 'enabled', checked) }}
+              label="Enabled"
+            />
+          </Flex>
+
+          <Flex mb="xs">
+            <Text size="sm" style={{ width: '80px' }}>Source:</Text>
+            <Select
+              size="xs"
+              data={[{value: 'none', label: 'None'}, ...availableNodeIds.map(node => ({
+                value: node.id,
+                label: node.label || node.id
+              }))]}
+              value={env2.source ?? 'none'}
+              onChange={(value) => { onEnvChange(2, 'source', value === 'none' ? null : value) }}
+              disabled={!env2.enabled}
+              style={{ flex: 1 }}
+            />
+          </Flex>
+
+          <div className={classes.knobsRow}>
+            <div className={classes.knobColumn}>
+              <Knob
+                min={0.001}
+                max={1}
+                step={0.001}
+                value={env2.attack}
+                onChange={(value) => { onEnvChange(2, 'attack', value) }}
+                color="#5af"
+                bgcolor="#222"
+                size="medium"
+                label={(value) => `${(value * 1000).toFixed(0)} ms`}
+              />
+              <Text size="xs" ta="center" mt={5}>Attack</Text>
+            </div>
+
+            <div className={classes.knobColumn}>
+              <Knob
+                min={0.001}
+                max={2}
+                step={0.001}
+                value={env2.release}
+                onChange={(value) => { onEnvChange(2, 'release', value) }}
+                color="#5af"
+                bgcolor="#222"
+                size="medium"
+                label={(value) => `${(value * 1000).toFixed(0)} ms`}
+              />
+              <Text size="xs" ta="center" mt={5}>Release</Text>
+            </div>
+          </div>
+
+          <div className={classes.knobsRow} style={{marginTop: '10px'}}>
+            <div className={classes.knobColumn} style={{width: '100%'}}>
+              <Knob
+                min={-1}
+                max={1}
+                step={0.01}
+                value={env2.amount}
+                onChange={(value) => { onEnvChange(2, 'amount', value) }}
+                color={env2.amount >= 0 ? "#5af" : "#f5a"}
+                bgcolor="#222"
+                size="medium"
+                label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
+              />
+              <Text size="xs" ta="center" mt={5}>Amount</Text>
+              <Text size="xs" c="dimmed" ta="center">+ up / - down</Text>
             </div>
           </div>
         </Box>
@@ -187,7 +375,7 @@ export function ModulationPanel({
               color={getChaosColor(chaosValue)}
               bgcolor="#222"
               size="large"
-              label={`${chaosValue}%`}
+              label={(value) => `${value}%`}
             />
           </div>
 

@@ -79,13 +79,13 @@ const initialGraph: AudioGraph = {
     enabled: false,
     frequency: 1.0, // 1 Hz
     waveform: 'sine',
-    amount: 0.5,
+    amount: 0,
   },
   lfo2: {
     enabled: false,
     frequency: 0.5, // 0.5 Hz
     waveform: 'triangle',
-    amount: 0.5,
+    amount: 0,
   },
 
   // Default envelope follower settings
@@ -93,14 +93,14 @@ const initialGraph: AudioGraph = {
     enabled: false,
     attack: 0.01, // 10ms
     release: 0.1, // 100ms
-    amount: 0.5,
+    amount: 0,
     source: null,
   },
   envelopeFollower2: {
     enabled: false,
     attack: 0.05, // 50ms
     release: 0.5, // 500ms
-    amount: 0.5,
+    amount: 0,
     source: null,
   },
 };
@@ -273,7 +273,7 @@ function App() {
       parameterId: string,
       source: 'lfo1' | 'lfo2' | 'env1' | 'env2',
       enabled: boolean,
-      amount = 0.5
+      amount = 0
     ) => {
       if (!workletNodeRef.current || !audioInitialized || !processorReady) {
         setAudioError('Audio system not ready. Cannot update modulation.');
@@ -452,7 +452,7 @@ function App() {
         enabled: false,
         frequency: lfoNumber === 1 ? 1.0 : 0.5,
         waveform: lfoNumber === 1 ? 'sine' : 'triangle',
-        amount: 0.5
+        amount: 0
       };
 
       // Create updated LFO settings with the new parameter value
@@ -481,12 +481,46 @@ function App() {
     });
   };
 
-  const handleOpenModulationSettings = () => {
-    setShowModulationSettings(true);
-  };
+  const handleEnvelopeFollowerChange = (envNumber: 1 | 2, paramName: string, value: number | string | boolean | null) => {
+    if (!workletNodeRef.current || !audioInitialized || !processorReady) {
+      setAudioError('Audio system not ready. Cannot update envelope follower settings.');
+      return;
+    }
 
-  const handleCloseModulationSettings = () => {
-    setShowModulationSettings(false);
+    setAudioGraph(prevGraph => {
+      const envKey = `envelopeFollower${envNumber}` as const;
+      const currentEnv = prevGraph[envKey] ?? {
+        enabled: false,
+        attack: envNumber === 1 ? 0.01 : 0.05,
+        release: envNumber === 1 ? 0.1 : 0.5,
+        amount: 0,
+        source: null
+      };
+
+      // Create updated envelope follower settings with the new parameter value
+      const updatedEnv = {
+        ...currentEnv,
+        [paramName]: value
+      };
+
+      // Create updated graph with new envelope follower settings
+      const updatedGraph = {
+        ...prevGraph,
+        [envKey]: updatedEnv
+      };
+
+      // Send the updated graph to the worklet
+      if (workletNodeRef.current) {
+        const message: UpdateGraphMessage = {
+          type: MainThreadMessageType.UPDATE_GRAPH,
+          payload: { graph: updatedGraph },
+        };
+        workletNodeRef.current.port.postMessage(message);
+        console.log(`[App.tsx] Sent UPDATE_GRAPH message after ENV${envNumber} parameter change: ${paramName} = ${value}`);
+      }
+
+      return updatedGraph;
+    });
   };
 
   return (
@@ -502,7 +536,7 @@ function App() {
             onChaosChange={handleChaosChange}
             isMono={isMono}
             onMonoToggle={handleMonoToggle}
-            onOpenModulationSettings={handleOpenModulationSettings}
+            onOpenModulationSettings={() => { setShowModulationSettings(true); }}
           />
           <Stack>
             <Controls
@@ -540,7 +574,7 @@ function App() {
       />
       <Modal
         opened={showModulationSettings}
-        onClose={handleCloseModulationSettings}
+        onClose={() => { setShowModulationSettings(false); }}
         title="Global Modulation Settings"
         size="xl"
       >
@@ -549,16 +583,35 @@ function App() {
             enabled: false,
             frequency: 1.0,
             waveform: 'sine',
-            amount: 0.5,
+            amount: 0,
           }}
           lfo2={audioGraph.lfo2 ?? {
             enabled: false,
             frequency: 0.5,
             waveform: 'triangle',
-            amount: 0.5,
+            amount: 0,
           }}
+          env1={audioGraph.envelopeFollower1 ?? {
+            enabled: false,
+            attack: 0.01,
+            release: 0.1,
+            amount: 0,
+            source: null,
+          }}
+          env2={audioGraph.envelopeFollower2 ?? {
+            enabled: false,
+            attack: 0.05,
+            release: 0.5,
+            amount: 0,
+            source: null,
+          }}
+          availableNodeIds={audioGraph.nodes.map(node => ({
+            id: node.id,
+            label: node.label ?? node.type
+          }))}
           chaosValue={globalParameters.chaos * 100}
           onLFOChange={handleLFOParameterChange}
+          onEnvChange={handleEnvelopeFollowerChange}
           onChaosChange={handleChaosChange}
         />
       </Modal>

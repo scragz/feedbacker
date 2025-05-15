@@ -3,47 +3,7 @@
  * AudioWorkletProcessor for the Multichannel Feedback Network.
  */
 
-// Restore and refine AudioWorklet global types
-declare global {
-
-  let sampleRate: number;
-
-  let currentTime: number;
-
-  let currentFrame: number;
-
-  // Define a base interface for the processor instance
-  interface AudioWorkletProcessor {
-    readonly port: MessagePort;
-    process(
-      inputs: Float32Array[][],
-      outputs: Float32Array[][],
-      parameters: Record<string, Float32Array>
-    ): boolean;
-  }
-
-  // Ensure this global AudioWorkletNodeOptions is what the constructor expects
-  interface AudioWorkletNodeOptions {
-    numberOfInputs?: number;
-    numberOfOutputs?: number;
-    outputChannelCount?: number[];
-    // Allow any other properties for flexibility
-    [key: string]: unknown;
-  }
-
-  // Define the constructor signature for an AudioWorkletProcessor
-  const AudioWorkletProcessor: {
-    prototype: AudioWorkletProcessor;
-    // The constructor options should match the defined interface
-    new (options?: AudioWorkletNodeOptions): AudioWorkletProcessor;
-  };
-
-  function registerProcessor(
-    name: string,
-    // The processor constructor options should also match
-    processorCtor: new (options?: AudioWorkletNodeOptions) => AudioWorkletProcessor
-  ): void;
-}
+import './types'; // Import our custom type definitions
 
 import {
   type AudioGraph,
@@ -79,9 +39,9 @@ class MfnProcessor extends AudioWorkletProcessor {
   private previousKernelOutputBuffers: Map<NodeId, Float32Array[]> = new Map<NodeId, Float32Array[]>();
   private nodeOrder: NodeId[] = [];
 
-  private sampleRateInternal: number = globalThis.AudioWorkletGlobalScope?.sampleRate ?? 44100;
-  private maxOutputChannels: number = DEFAULT_OUTPUT_CHANNELS;
-  private chaosValue: number = 0; // Added internal state for chaos
+  private sampleRateInternal = globalThis.AudioWorkletGlobalScope?.sampleRate ?? 44100;
+  private maxOutputChannels = DEFAULT_OUTPUT_CHANNELS;
+  private chaosValue = 0; // Added internal state for chaos
 
   // Global LFO and envelope follower processors
   private lfo1: LFOProcessor;
@@ -89,26 +49,27 @@ class MfnProcessor extends AudioWorkletProcessor {
   private envelopeFollower1: EnvelopeFollower;
   private envelopeFollower2: EnvelopeFollower;
 
-  private currentBlockOutputChannels: number = DEFAULT_OUTPUT_CHANNELS;
-  private currentBlockSize: number = DEFAULT_BLOCK_SIZE;
+  private currentBlockOutputChannels = DEFAULT_OUTPUT_CHANNELS;
+  private currentBlockSize = DEFAULT_BLOCK_SIZE;
 
   private logCounter = 0;
-  private readonly logThrottle: number = 200;
+  private readonly logThrottle = 200;
 
   private isInitialized = false;
 
   constructor(options?: AudioWorkletNodeOptions) {
     super(options);
     if (options?.processorOptions) {
-      this.sampleRateInternal = options.processorOptions.sampleRate ?? this.sampleRateInternal;
-      this.maxOutputChannels = options.processorOptions.maxChannels ?? this.maxOutputChannels;
+      const processorOpts = options.processorOptions as Record<string, unknown>;
+      this.sampleRateInternal = (processorOpts.sampleRate as number) ?? this.sampleRateInternal;
+      this.maxOutputChannels = (processorOpts.maxChannels as number) ?? this.maxOutputChannels;
     }
 
     // Initialize global LFOs and envelope followers
-    this.lfo1 = new LFOProcessor(1, 'sine', 1, this.sampleRateInternal);
-    this.lfo2 = new LFOProcessor(0.5, 'triangle', 1, this.sampleRateInternal);
-    this.envelopeFollower1 = new EnvelopeFollower(0.01, 0.1, 1, this.sampleRateInternal);
-    this.envelopeFollower2 = new EnvelopeFollower(0.05, 0.5, 1, this.sampleRateInternal);
+    this.lfo1 = new LFOProcessor(1, 'sine', 0, this.sampleRateInternal); // Changed amount from 1 to 0
+    this.lfo2 = new LFOProcessor(0.5, 'triangle', 0, this.sampleRateInternal); // Changed amount from 1 to 0
+    this.envelopeFollower1 = new EnvelopeFollower(0.01, 0.1, 0, this.sampleRateInternal); // Changed amount from 1 to 0
+    this.envelopeFollower2 = new EnvelopeFollower(0.05, 0.5, 0, this.sampleRateInternal); // Changed amount from 1 to 0
 
     this.port.onmessage = this.handleMessage.bind(this);
     console.log('[MFNProcessor] Initialized. Sample Rate:', this.sampleRateInternal, 'Max Channels:', this.maxOutputChannels);
@@ -197,7 +158,7 @@ class MfnProcessor extends AudioWorkletProcessor {
     this._buildGraphInternals();
     this.isInitialized = true;
     // Though PROCESSOR_READY doesn't send the graph, let's log what the graph state is after init.
-    console.log('[MFNProcessor] After _initProcessor, graph nodes count:', this.graph?.nodes.length);
+    console.log('[MFNProcessor] After _initProcessor, graph nodes count:', this.graph.nodes.length);
     this.port.postMessage({ type: WorkletMessageType.PROCESSOR_READY });
     console.log('[MFNProcessor] Processor ready.');
   }
@@ -211,7 +172,7 @@ class MfnProcessor extends AudioWorkletProcessor {
     }
     console.log('[MFNProcessor] Updating graph with payload:', payload.graph);
     this._buildGraphInternals();
-    console.log('[MFNProcessor] After _updateGraph and _buildGraphInternals, sending GRAPH_UPDATED. Nodes count:', this.graph?.nodes.length, 'Node IDs:', this.graph?.nodes.map(n => n.id).join(', '));
+    console.log('[MFNProcessor] After _updateGraph and _buildGraphInternals, sending GRAPH_UPDATED. Nodes count:', this.graph.nodes.length, 'Node IDs:', this.graph.nodes.map(n => n.id).join(', '));
     this.port.postMessage({ type: WorkletMessageType.GRAPH_UPDATED, payload: this.graph });
   }
 
@@ -466,7 +427,7 @@ class MfnProcessor extends AudioWorkletProcessor {
     nodeParamDefs: Record<string, ParameterDefinition<ParameterValue>>
   ): Record<string, ParameterValue> {
     // Start with a copy of the original parameters
-    const modulated: Record<string, ParameterValue> = { ...node.parameters };
+    const modulated: Record<string, ParameterValue> = { ...node.parameters } as Record<string, ParameterValue>;
 
     // Skip if node has no modulation or chaos is zero and no modulators are active
     if (!node.modulation ||
@@ -486,18 +447,12 @@ class MfnProcessor extends AudioWorkletProcessor {
 
     // Process each parameter that has modulation configured
     for (const [paramId, paramMods] of Object.entries(node.modulation)) {
-      // Skip parameters with no modulation
-      if (!paramMods) continue;
-
       // Get the original parameter value and its definition
       const originalValue = node.parameters[paramId];
       const paramDef = nodeParamDefs[paramId];
 
-      // Skip if not a numeric parameter
-      if (typeof originalValue !== 'number' || !paramDef) continue;
-
       // Base amount is the parameter value
-      let baseValue = originalValue;
+      const baseValue = originalValue;
       let totalModulation = 0;
 
       // Calculate the modulation range based on parameter definition
@@ -570,120 +525,6 @@ class MfnProcessor extends AudioWorkletProcessor {
 
     return modulated;
   }
-
-  /**
-   * Calculates modulated parameter values based on:
-   * - Original parameter values
-   * - Current LFO and envelope follower values
-   * - Global chaos level
-   * - Parameter type (extra chaos for sensitive parameters)
-   */
-  private _calculateModulatedParameters_v2(
-    node: AudioNodeInstance,
-    nodeParamDefs: Record<string, any>
-  ): Record<string, any> {
-    if (!node || !node.parameters) {
-      return {};
-    }
-
-    // Start with original parameters
-    const modulated: Record<string, any> = { ...node.parameters };
-
-    // If no modulation or no chaos, return original values
-    if (!node.modulation && this.chaosValue === 0) {
-      return modulated;
-    }
-
-    // Process each parameter
-    for (const [paramName, originalValue] of Object.entries(node.parameters)) {
-      // Skip parameters that can't be modulated (boolean, string, etc)
-      if (typeof originalValue !== 'number') {
-        continue;
-      }
-
-      // Get parameter definition
-      const paramDef = nodeParamDefs[paramName];
-      if (!paramDef) continue;
-
-      let modValue = originalValue;
-      let modulationAmount = 0;
-
-      // Apply modulation from LFOs and envelope followers if configured for this parameter
-      if (node.modulation && node.modulation[paramName]) {
-        const paramModulation = node.modulation[paramName];
-
-        // Apply LFO1 modulation
-        if (paramModulation.lfo1?.enabled && this.lfo1.isEnabled()) {
-          const lfo1Amount = paramModulation.lfo1.amount || 0.5;
-          modulationAmount += this.lfo1Value * lfo1Amount;
-        }
-
-        // Apply LFO2 modulation
-        if (paramModulation.lfo2?.enabled && this.lfo2.isEnabled()) {
-          const lfo2Amount = paramModulation.lfo2.amount || 0.5;
-          modulationAmount += this.lfo2Value * lfo2Amount;
-        }
-
-        // Apply envelope follower modulation
-        if (paramModulation.env1?.enabled && this.envelopeFollower1.isEnabled()) {
-          const env1Amount = paramModulation.env1.amount || 0.5;
-          modulationAmount += this.envelopeFollower1.getCurrentValue() * env1Amount;
-        }
-
-        if (paramModulation.env2?.enabled && this.envelopeFollower2.isEnabled()) {
-          const env2Amount = paramModulation.env2.amount || 0.5;
-          modulationAmount += this.envelopeFollower2.getCurrentValue() * env2Amount;
-        }
-      }
-
-      // Apply chaos modulation (more for sensitive parameters)
-      if (this.chaosValue > 0) {
-        // Determine if this parameter is sensitive to chaos
-        const isSensitiveParam =
-          paramName.includes('frequency') ||
-          paramName.includes('resonance') ||
-          paramName.includes('feedback') ||
-          paramName.includes('delay');
-
-        // Calculate random factor - extra for sensitive parameters
-        const randomFactor = Math.random() * 2 - 1; // Range: -1 to 1
-        const chaos = this.chaosValue * (isSensitiveParam ? 1.5 : 1.0);
-
-        // Scale chaos by parameter range if available
-        let paramRange = 1.0;
-        if (paramDef.min !== undefined && paramDef.max !== undefined) {
-          paramRange = paramDef.max - paramDef.min;
-        }
-
-        // Add chaos modulation proportional to parameter value and sensitivity
-        modulationAmount += randomFactor * chaos * (paramRange * 0.3);
-      }
-
-      // Apply total modulation to the parameter
-      if (modulationAmount !== 0) {
-        // Scale modulationAmount based on parameter range if available
-        if (paramDef.min !== undefined && paramDef.max !== undefined) {
-          const paramRange = paramDef.max - paramDef.min;
-          const scaledAmount = modulationAmount * paramRange * 0.3; // Scale to reasonable percentage of range
-          modValue += scaledAmount;
-
-          // Clamp to parameter range
-          modValue = Math.max(paramDef.min, Math.min(paramDef.max, modValue));
-        } else {
-          // Without param range info, use percentage of current value
-          modValue *= (1 + modulationAmount * 0.3);
-        }
-      }
-
-      modulated[paramName] = modValue;
-    }
-
-    return modulated;
-  }
-
-  // LFO values calculated once per audio block for efficiency
-  private lfo1Value: number = 0;
-  private lfo2Value: number = 0;
 
   private _createDefaultRoutingMatrix(): void {
     if (!this.graph || this.graph.nodes.length === 0) {
@@ -790,18 +631,18 @@ class MfnProcessor extends AudioWorkletProcessor {
 
       // Process global LFOs and envelope followers
       if (this.lfo1.isEnabled()) {
-        this.lfo1.process();
+        this.lfo1Value = this.lfo1.process();
       }
 
       if (this.lfo2.isEnabled()) {
-        this.lfo2.process();
+        this.lfo2Value = this.lfo2.process();
       }
 
       // Process envelope followers using input from relevant nodes
       if (this.envelopeFollower1.isEnabled() && this.envelopeFollower1.isForSource(destNodeId)) {
         // Use the first channel of mixed inputs as the envelope source
         for (let s = 0; s < this.currentBlockSize; s++) {
-          if (mixedInputsForDestNode[0] && mixedInputsForDestNode[0][s] !== undefined) {
+          if (mixedInputsForDestNode[0]?.[s] !== undefined) {
             this.envelopeFollower1.process(Math.abs(mixedInputsForDestNode[0][s]));
           }
         }
@@ -810,7 +651,7 @@ class MfnProcessor extends AudioWorkletProcessor {
       if (this.envelopeFollower2.isEnabled() && this.envelopeFollower2.isForSource(destNodeId)) {
         // Use the first channel of mixed inputs as the envelope source
         for (let s = 0; s < this.currentBlockSize; s++) {
-          if (mixedInputsForDestNode[0] && mixedInputsForDestNode[0][s] !== undefined) {
+          if (mixedInputsForDestNode[0]?.[s] !== undefined) {
             this.envelopeFollower2.process(Math.abs(mixedInputsForDestNode[0][s]));
           }
         }
@@ -818,7 +659,7 @@ class MfnProcessor extends AudioWorkletProcessor {
 
       // Get parameter definitions for this node type
       const nodeType = destNode.type;
-      const paramDefs = NODE_PARAMETER_DEFINITIONS[nodeType] || {};
+      const paramDefs = NODE_PARAMETER_DEFINITIONS[nodeType] ?? {};
 
       // Calculate modulated parameters if node has modulation
       const modulatedParams = (destNode.modulation && Object.keys(destNode.modulation).length > 0) || this.chaosValue > 0
@@ -848,8 +689,8 @@ class MfnProcessor extends AudioWorkletProcessor {
     const finalOutputBuffers = outputs[0]; // Assuming outputs[0] is the main output
 
     // Clear final output buffers before summing
-    for (let i = 0; i < finalOutputBuffers.length; i++) {
-      finalOutputBuffers[i].fill(0);
+    for (const channelData of finalOutputBuffers) {
+      channelData.fill(0);
     }
 
     let outputMixerFound = false;
@@ -893,9 +734,9 @@ class MfnProcessor extends AudioWorkletProcessor {
     }
 
     // Apply master gain
-    for (let i = 0; i < finalOutputBuffers.length; i++) {
+    for (const channelBuffer of finalOutputBuffers) {
       for (let s = 0; s < this.currentBlockSize; s++) {
-        finalOutputBuffers[i][s] *= masterGain;
+        channelBuffer[s] *= masterGain;
       }
     }
 

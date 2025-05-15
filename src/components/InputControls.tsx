@@ -24,7 +24,7 @@ interface KnobProps {
   onChange: (value: number) => void;
   sprites?: number;
   src?: string;
-  label?: string;
+  label?: string | ((value: number) => string);
   size?: 'small' | 'medium' | 'large';
   disabled?: boolean;
 }
@@ -101,7 +101,11 @@ export const Knob: React.FC<KnobProps> = ({
         data-sprites={sprites}
         data-src={src}
       />
-      {label && <div className="knob-label" style={{ fontSize: '0.8rem', marginTop: '5px' }}>{label}</div>}
+      {label && (
+        <div className="knob-label" style={{ fontSize: '0.8rem', marginTop: '5px' }}>
+          {typeof label === 'function' ? label(value) : label}
+        </div>
+      )}
     </div>
   );
 };

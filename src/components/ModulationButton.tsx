@@ -25,7 +25,7 @@ export function ModulationButton({
   size = 'xs',
   onChange,
   disabled = false,
-  amount = 0.5,
+  amount = 0,
   onAmountChange,
   showAmount = true,
   ...rest
@@ -54,19 +54,24 @@ export function ModulationButton({
       {showAmount && onAmountChange && (
         <div className={`${classes.knobContainer} ${!active ? classes.inactiveKnob : ''}`}>
           <Knob
-            min={0}
+            min={-1}
             max={1}
             step={0.01}
             value={amount}
             onChange={onAmountChange}
-            color={active ? color : '#555'}
+            color={active ? (amount >= 0 ? color : 'pink') : '#555'}
             bgcolor="#222"
             size="small"
             diameter={32}
-            label={`${Math.round(amount * 100)}%`}
+            label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
             disabled={!active || disabled}
           />
           <Text size="xs" ta="center" className={classes.modulationLabel}>Amount</Text>
+          {amount !== 0 && (
+            <Text size="xs" ta="center" c="dimmed" className={classes.modulationLabelInfo}>
+              {amount > 0 ? 'Raises' : 'Lowers'} values
+            </Text>
+          )}
         </div>
       )}
     </div>
@@ -102,10 +107,10 @@ export function ModulationButtonGroup({
   const env1Active = modulation?.env1?.enabled ?? false;
   const env2Active = modulation?.env2?.enabled ?? false;
 
-  const lfo1Amount = modulation?.lfo1?.amount ?? 0.5;
-  const lfo2Amount = modulation?.lfo2?.amount ?? 0.5;
-  const env1Amount = modulation?.env1?.amount ?? 0.5;
-  const env2Amount = modulation?.env2?.amount ?? 0.5;
+  const lfo1Amount = modulation?.lfo1?.amount ?? 0;
+  const lfo2Amount = modulation?.lfo2?.amount ?? 0;
+  const env1Amount = modulation?.env1?.amount ?? 0;
+  const env2Amount = modulation?.env2?.amount ?? 0;
 
   return (
     <div className={classes.modulationButtonGroup}>

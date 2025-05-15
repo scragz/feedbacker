@@ -1,5 +1,5 @@
 import { ActionIcon, Button, Group, Text, Tooltip } from '@mantine/core';
-import { IconPlayerPlay, IconPlayerStop, IconPlayerRecord, IconMoodCrazyHappy, IconVolume, IconVolumeOff, IconSettings } from '@tabler/icons-react';
+import { IconPlayerPlay, IconPlayerStop, IconPlayerRecord, IconMoodCrazyHappy, IconVolume, IconVolumeOff } from '@tabler/icons-react';
 import classes from './TransportBar.module.css';
 import { Knob, Switch } from './InputControls';
 
@@ -64,14 +64,14 @@ export function TransportBar({
         </Group>
 
         {onOpenModulationSettings && (
-          <ActionIcon
+          <Button
             onClick={onOpenModulationSettings}
-            title="Modulation Settings"
-            variant="light"
-            size="lg"
+            variant="subtle"
+            size="sm"
+            leftSection={<IconMoodCrazyHappy size={18} />}
           >
-            <IconSettings size={20} />
-          </ActionIcon>
+            Advanced Modulation
+          </Button>
         )}
 
         <Group className={classes.chaosControl}>
