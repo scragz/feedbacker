@@ -1,9 +1,29 @@
 .transportBar {
   background-color: var(--mantine-color-dark-6);
   border-bottom: 1px solid var(--mantine-color-dark-4);
+  min-height: 80px;
 }
 
 .chaosControl {
   display: flex;
   align-items: center;
+  padding: 0 10px;
+}
+
+.chaosKnob {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+}
+
+.monoControl {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 5px;
+}
+
+.stereoSwitch {
+  margin: 0 5px;
 }

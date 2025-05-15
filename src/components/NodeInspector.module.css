@@ -16,3 +16,44 @@
 .parameterControl {
   margin-bottom: var(--mantine-spacing-md);
 }
+
+.knobContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 10px 0;
+  padding: 5px 0;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+/* Knob groups for organizing multiple knobs */
+.knobGroup {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  align-items: center;
+  margin: 10px 0;
+}
+
+/* For modulation amounts which are smaller */
+.modulationKnob {
+  margin-left: 10px;
+}
+
+/* Switch controls */
+.switchContainer {
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.switchLabel {
+  margin-left: 10px;
+  font-size: 0.9rem;
+}
+
+/* Add space around parameter labels */
+.parameterControl > div {
+  margin-top: 5px;
+}

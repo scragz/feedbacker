@@ -1,4 +1,4 @@
-import { Box, Slider, Stack, Text, Title, Select } from '@mantine/core';
+import { Box, Stack, Text, Title, Select } from '@mantine/core';
 import {
   type AudioNodeInstance,
   type ParameterId,
@@ -8,6 +8,7 @@ import {
 } from '../audio/schema';
 import { ModulationButtonGroup } from './ModulationButton';
 import classes from './NodeInspector.module.css';
+import { Knob, Switch } from './controls/InputControls';
 
 interface NodeInspectorProps {
   selectedNode: AudioNodeInstance | null;
@@ -20,6 +21,11 @@ interface NodeInspectorProps {
     amount?: number
   ) => void;
 }
+
+// Main parameters that should use large knobs
+const MAIN_PARAMETERS = [
+  'frequency', 'level', 'mix', 'cutoff', 'resonance', 'time', 'feedback', 'volume'
+];
 
 export function NodeInspector({
   selectedNode,
@@ -52,10 +58,19 @@ export function NodeInspector({
             );
           }
 
+          // Determine if it's a main parameter (use large knob) or a secondary parameter
+          const isMainParameter = MAIN_PARAMETERS.includes(paramId);
+
+          // Choose the knob size based on parameter importance
+          const knobSize = isMainParameter ? 'large' : 'medium';
+
+          // Set knob colors based on parameter type
+          const knobColor = isMainParameter ? '#f55' : '#5af';
+
           return (
             <Box key={paramId} className={classes.parameterControl}>
               <Text size="sm" fw={500} mb={4}>
-                {paramDef.label || paramId}
+                {paramDef.label ?? paramId}
               </Text>
               {paramDef.type === 'enum' && paramDef.enumValues ? (
                 <Select
@@ -69,35 +84,34 @@ export function NodeInspector({
                   allowDeselect={false}
                 />
               ) : paramDef.type === 'float' || paramDef.type === 'integer' ? (
-                <Slider
-                  value={currentValue as number}
-                  onChange={(value) => {
-                    onParameterChange(selectedNode.id, paramId, value);
-                  }}
-                  min={paramDef.minValue}
-                  max={paramDef.maxValue}
-                  step={paramDef.step ?? (paramDef.type === 'integer' ? 1 : 0.01)}
-                  scale={paramDef.scale === 'logarithmic' && paramDef.minValue && paramDef.maxValue && paramDef.minValue > 0 ?
-                    (val) => {
-                      // Safely calculate logarithmic scale
-                      const min = paramDef.minValue ?? 0.001; // Safety minimum
-                      const max = paramDef.maxValue ?? 1;
-                      return Math.log10(val / min) / Math.log10(max / min) * 100;
-                    } :
-                    undefined}
-                  label={(value) => {
-                    if (typeof value === 'number') {
-                      const precision = paramDef.type === 'integer' ? 0 :
-                                      (paramDef.unit === '%' || paramDef.unit === 'dB' ? 1 : 2);
-                      return `${value.toFixed(precision)} ${paramDef.unit ?? ''}`.trim();
+                <div className={classes.knobContainer}>
+                  <Knob
+                    min={paramDef.minValue ?? 0}
+                    max={paramDef.maxValue ?? 100}
+                    step={paramDef.step ?? (paramDef.type === 'integer' ? 1 : 0.01)}
+                    value={currentValue as number}
+                    onChange={(value) => {
+                      onParameterChange(selectedNode.id, paramId, value);
+                    }}
+                    color={knobColor}
+                    bgcolor="#222"
+                    size={knobSize}
+                    label={
+                      `${typeof currentValue === 'number'
+                        ? currentValue.toFixed(paramDef.type === 'integer' ? 0 :
+                          (paramDef.unit === '%' || paramDef.unit === 'dB' ? 1 : 2))
+                        : currentValue}${paramDef.unit ?? ''}`
                     }
-                    return String(value);
-                  }}
-                />
+                  />
+                </div>
               ) : paramDef.type === 'boolean' ? (
-                <Text size="sm">
-                  {paramDef.label}: {currentValue?.toString() ?? 'N/A'} (UI not implemented)
-                </Text>
+                <Switch
+                  checked={currentValue as boolean}
+                  onChange={(checked) => {
+                    onParameterChange(selectedNode.id, paramId, checked);
+                  }}
+                  label={paramDef.label ?? paramId}
+                />
               ) : (
                 <Text size="xs" c="dimmed" mt={2}>
                   Unsupported parameter type: {paramDef.type}
@@ -125,5 +139,9 @@ export function NodeInspector({
     </Box>
   );
 }
+
+export default NodeInspector;
+
+export default NodeInspector;
 
 export default NodeInspector;

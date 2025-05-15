@@ -1,6 +1,8 @@
-import { Box, Flex, Group, Select, Slider, Switch, Text, Tooltip } from '@mantine/core';
+import { Box, Flex, Group, Select, Text, Tooltip } from '@mantine/core';
 import { IconWaveSine, IconWaveSquare, IconWaveSawTool } from '@tabler/icons-react';
 import type { LFOWaveformType } from '../audio/schema';
+import { Knob, Switch } from './controls/InputControls';
+import classes from './ModulationPanel.module.css';
 
 interface ModulationPanelProps {
   lfo1: {
@@ -43,20 +45,26 @@ export function ModulationPanel({
     { value: 'random', label: 'Random' }
   ];
 
+  // Get color based on value for chaos knob
+  const getChaosColor = (value: number) => {
+    if (value > 75) return '#f55';
+    if (value > 50) return '#f95';
+    return '#5af';
+  };
+
   return (
     <Box p="md" style={{ maxWidth: '800px', margin: '0 auto' }}>
       <Text size="lg" fw={600} mb="md">Modulation Controls</Text>
 
       <Group mb="md" align="flex-start">
         {/* LFO 1 Controls */}
-        <Box style={{ flex: 1, minWidth: '220px' }}>
+        <Box style={{ flex: 1, minWidth: '220px' }} className={classes.lfoSection}>
           <Flex justify="space-between" align="center" mb="xs">
             <Text fw={500}>LFO 1</Text>
             <Switch
               checked={lfo1.enabled}
-              onChange={(event) => { onLFOChange(1, 'enabled', event.currentTarget.checked) }}
+              onChange={(checked) => { onLFOChange(1, 'enabled', checked) }}
               label="Enabled"
-              labelPosition="left"
             />
           </Flex>
 
@@ -73,43 +81,47 @@ export function ModulationPanel({
             />
           </Flex>
 
-          <Flex direction="column" mb="xs">
-            <Text size="sm">Frequency:</Text>
-            <Slider
-              min={0.1}
-              max={20}
-              step={0.1}
-              value={lfo1.frequency}
-              onChange={(value) => { onLFOChange(1, 'frequency', value ) }}
-              label={(value) => `${value.toFixed(1)} Hz`}
-              disabled={!lfo1.enabled}
-              scale={(val) => Math.log10(val / 0.1) / Math.log10(20 / 0.1) * 100}
-            />
-          </Flex>
+          <div className={classes.knobsRow}>
+            <div className={classes.knobColumn}>
+              <Knob
+                min={0.1}
+                max={20}
+                step={0.1}
+                value={lfo1.frequency}
+                onChange={(value) => { onLFOChange(1, 'frequency', value) }}
+                color="#5af"
+                bgcolor="#222"
+                size="medium"
+                label={`${lfo1.frequency.toFixed(1)} Hz`}
+              />
+              <Text size="xs" ta="center" mt={5}>Frequency</Text>
+            </div>
 
-          <Flex direction="column">
-            <Text size="sm">Amount:</Text>
-            <Slider
-              min={0}
-              max={1}
-              step={0.01}
-              value={lfo1.amount}
-              onChange={(value) => { onLFOChange(1, 'amount', value) }}
-              label={(value) => `${Math.round(value * 100)}%`}
-              disabled={!lfo1.enabled}
-            />
-          </Flex>
+            <div className={classes.knobColumn}>
+              <Knob
+                min={0}
+                max={1}
+                step={0.01}
+                value={lfo1.amount}
+                onChange={(value) => { onLFOChange(1, 'amount', value) }}
+                color="#5af"
+                bgcolor="#222"
+                size="medium"
+                label={`${Math.round(lfo1.amount * 100)}%`}
+              />
+              <Text size="xs" ta="center" mt={5}>Amount</Text>
+            </div>
+          </div>
         </Box>
 
         {/* LFO 2 Controls */}
-        <Box style={{ flex: 1, minWidth: '220px' }}>
+        <Box style={{ flex: 1, minWidth: '220px' }} className={classes.lfoSection}>
           <Flex justify="space-between" align="center" mb="xs">
             <Text fw={500}>LFO 2</Text>
             <Switch
               checked={lfo2.enabled}
-              onChange={(event) => { onLFOChange(2, 'enabled', event.currentTarget.checked) }}
+              onChange={(checked) => { onLFOChange(2, 'enabled', checked) }}
               label="Enabled"
-              labelPosition="left"
             />
           </Flex>
 
@@ -126,58 +138,65 @@ export function ModulationPanel({
             />
           </Flex>
 
-          <Flex direction="column" mb="xs">
-            <Text size="sm">Frequency:</Text>
-            <Slider
-              min={0.05}
-              max={10}
-              step={0.05}
-              value={lfo2.frequency}
-              onChange={(value) => { onLFOChange(2, 'frequency', value) }}
-              label={(value) => `${value.toFixed(2)} Hz`}
-              disabled={!lfo2.enabled}
-              scale={(val) => Math.log10(val / 0.05) / Math.log10(10 / 0.05) * 100}
-            />
-          </Flex>
+          <div className={classes.knobsRow}>
+            <div className={classes.knobColumn}>
+              <Knob
+                min={0.05}
+                max={10}
+                step={0.05}
+                value={lfo2.frequency}
+                onChange={(value) => { onLFOChange(2, 'frequency', value) }}
+                color="#5af"
+                bgcolor="#222"
+                size="medium"
+                label={`${lfo2.frequency.toFixed(2)} Hz`}
+              />
+              <Text size="xs" ta="center" mt={5}>Frequency</Text>
+            </div>
 
-          <Flex direction="column">
-            <Text size="sm">Amount:</Text>
-            <Slider
-              min={0}
-              max={1}
-              step={0.01}
-              value={lfo2.amount}
-              onChange={(value) => { onLFOChange(2, 'amount', value) }}
-              label={(value) => `${Math.round(value * 100)}%`}
-              disabled={!lfo2.enabled}
-            />
-          </Flex>
+            <div className={classes.knobColumn}>
+              <Knob
+                min={0}
+                max={1}
+                step={0.01}
+                value={lfo2.amount}
+                onChange={(value) => { onLFOChange(2, 'amount', value) }}
+                color="#5af"
+                bgcolor="#222"
+                size="medium"
+                label={`${Math.round(lfo2.amount * 100)}%`}
+              />
+              <Text size="xs" ta="center" mt={5}>Amount</Text>
+            </div>
+          </div>
         </Box>
 
         {/* Chaos Control */}
-        <Box style={{ flex: 1, minWidth: '220px' }}>
+        <Box style={{ flex: 1, minWidth: '220px' }} className={classes.chaosSection}>
           <Tooltip label="Chaos increases modulation intensity and adds randomness">
-            <Text fw={500} mb="xs">Chaos Factor</Text>
+            <Text fw={500} mb="xs" className={classes.modulationTitle}>Chaos Factor</Text>
           </Tooltip>
 
-          <Flex direction="column">
-            <Slider
+          <div className={classes.chaosKnob}>
+            <Knob
               min={0}
               max={100}
+              step={1}
               value={chaosValue}
               onChange={onChaosChange}
-              label={(value) => `${value}%`}
-              size="lg"
-              thumbLabel="Chaos"
-              color="red"
-              marks={[
-                { value: 0, label: 'None' },
-                { value: 25, label: 'Mild' },
-                { value: 50, label: 'Medium' },
-                { value: 75, label: 'High' },
-                { value: 100, label: 'Extreme' },
-              ]}
+              color={getChaosColor(chaosValue)}
+              bgcolor="#222"
+              size="large"
+              label={`${chaosValue}%`}
             />
+          </div>
+
+          <Flex justify="space-between" mt={10}>
+            <Text size="xs" ta="center">None</Text>
+            <Text size="xs" ta="center">Mild</Text>
+            <Text size="xs" ta="center">Medium</Text>
+            <Text size="xs" ta="center">High</Text>
+            <Text size="xs" ta="center">Extreme</Text>
           </Flex>
         </Box>
       </Group>

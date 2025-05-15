@@ -1,0 +1,51 @@
+// filepath: /Users/scragz/Projects/feedbacker/src/components/ModulationPanel.module.css
+.knobsRow {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 15px;
+}
+
+.knobColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 48%;
+}
+
+.chaosKnob {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-top: 15px;
+}
+
+.modulationTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modulationPanel {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.lfoSection {
+  padding: 15px;
+  border-radius: 8px;
+}
+
+.lfoSection:hover {
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+.chaosSection {
+  padding: 15px;
+  border-radius: 8px;
+  background-color: rgba(255, 50, 50, 0.05);
+}
+
+.chaosSection:hover {
+  background-color: rgba(255, 50, 50, 0.1);
+}

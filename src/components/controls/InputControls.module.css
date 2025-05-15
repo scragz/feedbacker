@@ -1,0 +1,88 @@
+.knob-container {
+  display: inline-block;
+  margin: 10px;
+  position: relative;
+}
+
+.slider-container {
+  display: inline-block;
+  margin: 10px;
+  position: relative;
+}
+
+.switch-container {
+  display: inline-block;
+  margin: 10px;
+  position: relative;
+}
+
+.knob-label, .slider-label, .switch-label {
+  font-size: 0.8rem;
+  margin-top: 5px;
+  color: #aaa;
+  text-align: center;
+}
+
+/* Different sizes for knobs */
+.input-knob.small {
+  width: 40px;
+  height: 40px;
+}
+
+.input-knob.medium {
+  width: 64px;
+  height: 64px;
+}
+
+.input-knob.large {
+  width: 80px;
+  height: 80px;
+}
+
+/* Group styling */
+.control-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 15px;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.group-label {
+  width: 100%;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #ddd;
+}
+
+/* Adjust container for ModulationPanel */
+.modulation-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* Transport bar specific styling */
+.transport-knobs {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 5px 0;
+}
+
+.transport-knobs .knob-container {
+  margin: 0 5px;
+}
+
+/* Fancy focus/hover effects */
+.input-knob:focus, .input-slider:focus, .input-switch:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.3);
+}
+
+.input-knob:hover, .input-slider:hover, .input-switch:hover {
+  cursor: pointer;
+}

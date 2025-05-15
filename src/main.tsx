@@ -6,6 +6,9 @@ import App from './App.tsx';
 import './index.css';
 import { theme } from './theme.ts';
 
+// Import the inputKnobs script
+import './lib/inputKnobs.js';
+
 const rootElement = document.getElementById('root');
 
 if (rootElement) {

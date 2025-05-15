@@ -1,6 +1,7 @@
-import { ActionIcon, Button, Group, Slider, Text, Switch, Tooltip } from '@mantine/core';
+import { ActionIcon, Button, Group, Text, Tooltip } from '@mantine/core';
 import { IconPlayerPlay, IconPlayerStop, IconPlayerRecord, IconMoodCrazyHappy, IconVolume, IconVolumeOff, IconSettings } from '@tabler/icons-react';
 import classes from './TransportBar.module.css';
+import { Knob, Switch } from './controls/InputControls';
 
 interface TransportBarProps {
   audioContextState: AudioContextState | null;
@@ -27,6 +28,13 @@ export function TransportBar({
 }: TransportBarProps) {
   const isPlaying = audioContextState === 'running';
 
+  // Get color for chaos knob based on value
+  const getChaosColor = (value: number) => {
+    if (value > 75) return '#f55';
+    if (value > 50) return '#f95';
+    return '#5af';
+  };
+
   return (
     <Group className={classes.transportBar} justify="space-between" p="xs">
       <Group>
@@ -48,9 +56,9 @@ export function TransportBar({
           <IconVolumeOff size={18} />
           <Switch
             checked={!isMono}
-            onChange={(event) => { onMonoToggle(!event.currentTarget.checked) }}
+            onChange={(checked) => { onMonoToggle(!checked) }}
             label={isMono ? "Mono" : "Stereo"}
-            labelPosition="right"
+            className={classes.stereoSwitch}
           />
           <IconVolume size={18} />
         </Group>
@@ -71,25 +79,26 @@ export function TransportBar({
             <IconMoodCrazyHappy size={24} />
           </Tooltip>
           <Text size="sm">Chaos:</Text>
-          <Slider
-            value={chaosValue}
-            onChange={onChaosChange}
-            min={0}
-            max={100}
-            step={1}
-            style={{ width: 150 }}
-            label={(value) => { return `${value}%`; }}
-            marks={[
-              { value: 0, label: '0' },
-              { value: 50, label: '50' },
-              { value: 100, label: '100' }
-            ]}
-            color={chaosValue > 50 ? chaosValue > 75 ? 'red' : 'orange' : 'blue'}
-          />
+          <div className={classes.chaosKnob}>
+            <Knob
+              min={0}
+              max={100}
+              step={1}
+              value={chaosValue}
+              onChange={onChaosChange}
+              color={getChaosColor(chaosValue)}
+              bgcolor="#222"
+              size="medium"
+              label={`${chaosValue}%`}
+            />
+          </div>
         </Group>
       </Group>
     </Group>
   );
+}
+
+export default TransportBar;
 }
 
 export default TransportBar;
