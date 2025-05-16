@@ -1,0 +1,55 @@
+.sliderContainer {
+  width: 100%;
+  position: relative;
+}
+
+.sliderWrapper {
+  min-width: 50px;
+  width: 100%;
+}
+
+.slider {
+  --slider-track-bg: rgba(0, 0, 0, 0.2);
+  --slider-track-filled-bg: var(--mantine-color-mfnCyan-6);
+}
+
+.parameter {
+  --slider-thumb-size: 1.25rem;
+  --slider-track-height: 0.5rem;
+}
+
+.modulation {
+  --slider-track-bg: rgba(0, 0, 0, 0.2);
+  --slider-track-filled-bg: var(--mantine-color-mfnCyan-6);
+  --slider-thumb-size: 0.9rem;
+  --slider-track-height: 0.4rem;
+  margin-bottom: 5px;
+}
+
+.sliderLabel {
+  text-align: center;
+  font-weight: 500;
+  margin: 0;
+}
+
+.modulationDirection {
+  color: var(--mantine-color-dimmed);
+  font-size: 0.65rem;
+  margin-top: -5px;
+}
+
+/* Add a small highlight to the thumb for better visibility */
+.slider [data-mantine-slider-thumb] {
+  box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Increase thumb size slightly on hover for better UX */
+.slider:not([data-disabled]):hover [data-mantine-slider-thumb] {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}
+
+/* Common styles for different parameters */
+.slider[data-disabled] {
+  opacity: 0.6;
+}

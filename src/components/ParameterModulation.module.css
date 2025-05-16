@@ -1,22 +1,22 @@
 .container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin: 5px 0;
+  gap: 15px;
+  margin: 10px 0;
 }
 
 .modulationButtonWithKnob {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  margin: 0 4px;
+  gap: 8px;
+  width: 100%;
 }
 
 .knobContainer {
-  margin-top: 5px;
-  opacity: 0.7;
+  width: 100%;
+  margin-bottom: 5px;
+  opacity: 0.8;
   transition: opacity 0.3s ease;
 }
 
@@ -30,6 +30,11 @@
 
 .modulationLabel {
   font-size: 0.7rem;
-  color: #aaa;
+  color: var(--mantine-color-dimmed);
   margin-top: 2px;
+}
+
+.modulationLabelInfo {
+  font-size: 0.65rem;
+  margin-top: -2px;
 }

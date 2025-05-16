@@ -8,7 +8,7 @@ import {
 } from '../audio/schema';
 import { ParameterModulation } from './ParameterModulation';
 import classes from './NodeInspector.module.css';
-import { Knob } from './Controls/Knob';
+import { Slider } from './Controls/Slider';
 import { Switch } from './Controls/Switch';
 
 interface NodeInspectorProps {
@@ -62,9 +62,6 @@ export function NodeInspector({
           // Determine if it's a main parameter (use large knob) or a secondary parameter
           const isMainParameter = MAIN_PARAMETERS.includes(paramId);
 
-          // Set knob colors based on parameter type
-          const knobColor = isMainParameter ? '#f55' : '#5af';
-
           return (
             <Box key={paramId} className={classes.parameterControl}>
               <Text size="sm" fw={500} mb={4}>
@@ -80,10 +77,9 @@ export function NodeInspector({
                     }
                   }}
                   allowDeselect={false}
-                />
-              ) : paramDef.type === 'float' || paramDef.type === 'integer' ? (
+                />                ) : paramDef.type === 'float' || paramDef.type === 'integer' ? (
                 <div className={classes.knobContainer}>
-                  <Knob
+                  <Slider
                     min={paramDef.minValue ?? 0}
                     max={paramDef.maxValue ?? 100}
                     step={paramDef.step ?? (paramDef.type === 'integer' ? 1 : 0.01)}
@@ -91,24 +87,21 @@ export function NodeInspector({
                     onChange={(value) => {
                       onParameterChange(selectedNode.id, paramId, value);
                     }}
-                    color={knobColor}
-                    bgcolor="#222"
-                    label={(value) => {
+                    color={isMainParameter ? "red" : "mfnCyan"}
+                    variant="parameter"
+                    label={paramDef.label}
+                    formatDisplayValue={(value) => {
                       // Apply appropriate formatting based on parameter definition
                       let formattedValue = '';
-                      if (typeof value === 'number') {
-                        if (paramDef.type === 'integer') {
-                          formattedValue = value.toFixed(0);
-                        } else if (paramDef.unit === '%' || paramDef.unit === 'dB') {
-                          formattedValue = value.toFixed(1);
-                        } else {
-                          formattedValue = value.toFixed(2);
-                        }
+                      if (paramDef.type === 'integer') {
+                        formattedValue = value.toFixed(0);
+                      } else if (paramDef.unit === '%' || paramDef.unit === 'dB') {
+                        formattedValue = value.toFixed(1);
                       } else {
-                        formattedValue = String(value);
+                        formattedValue = value.toFixed(2);
                       }
                       // Add unit if available
-                      const unit = paramDef.unit ??  '';
+                      const unit = paramDef.unit ?? '';
                       return `${formattedValue}${unit}`;
                     }}
                   />

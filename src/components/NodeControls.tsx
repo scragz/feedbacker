@@ -47,7 +47,7 @@ const NodeControls: React.FC<NodeControlsProps> = ({ onAddNode, audioContextStat
           Delay
         </Button>
         <Button onClick={addBiquadNode} variant="light">
-          Biquad
+          Filter
         </Button>
         <Button onClick={addNoiseNode} variant="light">
           Noise
@@ -56,7 +56,7 @@ const NodeControls: React.FC<NodeControlsProps> = ({ onAddNode, audioContextStat
           Osc
         </Button>
         <Button onClick={addWaveshaperNode} variant="light">
-          Waveshaper
+          Shape
         </Button>
         <Button onClick={addMicrophoneNode} variant="light" disabled>
           Mic

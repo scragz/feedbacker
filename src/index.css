@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Frijole&family=Space+Grotesk:wght@300..700&family=VT323&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Frijole&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
 :root {
   color-scheme: dark;
@@ -40,7 +40,7 @@ body {
 button, .mantine-Button-root {
   border-radius: 8px;
   border: 1px solid transparent;
-  font-size: 1.5em;
+  font-size: 1em;
   font-weight: 700;
   font-family: var(--mantine-font-family-monospace);
   text-transform: uppercase;

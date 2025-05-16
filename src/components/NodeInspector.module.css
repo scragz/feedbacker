@@ -15,6 +15,12 @@
 
 .parameterControl {
   margin-bottom: var(--mantine-spacing-md);
+  padding-bottom: var(--mantine-spacing-md);
+  border-bottom: 1px solid var(--mantine-color-dark-5);
+}
+
+.parameterControl:last-child {
+  border-bottom: none;
 }
 
 .knobContainer {
@@ -22,7 +28,7 @@
   justify-content: center;
   align-items: center;
   margin: 10px 0;
-  padding: 5px 0;
+  padding: 8px;
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 4px;
 }
@@ -55,5 +61,10 @@
 
 /* Add space around parameter labels */
 .parameterControl > div {
-  margin-top: 5px;
+  margin-top: 8px;
+}
+
+/* More space for the modulation controls in their stacked layout */
+.parameterControl [class*="ParameterModulation_container"] {
+  margin: 15px 0;
 }

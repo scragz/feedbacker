@@ -1,7 +1,7 @@
-import { Box, Select, Text, Tooltip } from '@mantine/core';
+import { Box, Select, Text, Tooltip, Flex, Group, Stack } from '@mantine/core';
 import { IconWaveSine, IconWaveSquare, IconWaveSawTool } from '@tabler/icons-react';
 import type { LFOWaveformType } from '../audio/schema';
-import { Slider } from './Controls/Slider';
+import { Knob } from './Controls/Knob';
 import { Switch } from './Controls/Switch';
 import classes from './ModulationPanel.module.css';
 
@@ -79,45 +79,15 @@ export function ModulationPanel({
   ];
 
   // Get color based on value for chaos knob
-  const getChaosColor = (value: number): string => {
-    if (value > 75) return 'red';
-    if (value > 50) return 'orange';
-    return 'mfnCyan';
+  const getChaosColor = (value: number) => {
+    if (value > 75) return '#f55';
+    if (value > 50) return '#f95';
+    return '#5af';
   };
 
   return (
     <Box p="md" className={classes.container}>
       <Text size="lg" fw={600} mb="md">Modulation Controls</Text>
-
-      {/* Chaos Control - moved to the top, spanning across all sections */}
-      <Box className={classes.chaosContainer}>
-        <div className={classes.chaosKnob}>
-          <Slider
-            min={0}
-            max={100}
-            step={1}
-            value={chaosValue}
-            onChange={onChaosChange}
-            color={getChaosColor(chaosValue)}
-            showLabel={false}
-            showValue={true}
-            formatDisplayValue={(value) => `${value}%`}
-            marks={[
-              { value: 0, label: 'None' },
-              { value: 25, label: 'Mild' },
-              { value: 50, label: 'Med' },
-              { value: 75, label: 'High' },
-              { value: 100, label: 'X' }
-            ]}
-            size="lg"
-          />
-        </div>
-        <div className={classes.chaosLabelContainer}>
-          <Tooltip label="Chaos increases modulation intensity and adds randomness">
-            <Text className={classes.modulationTitle}>Chaos</Text>
-          </Tooltip>
-        </div>
-      </Box>
 
       <div className={classes.flexGroup}>
         {/* LFO 1 Controls */}
@@ -145,35 +115,34 @@ export function ModulationPanel({
 
           <div className={classes.knobsRow}>
             <div className={classes.knobColumn}>
-              <Slider
-                min={-1}
-                max={1}
-                step={0.01}
-                value={lfo1.amount}
-                onChange={(value) => { onLFOChange(1, 'amount', value) }}
-                color="mfnCyan"
-                disabled={!lfo1.enabled}
-                formatDisplayValue={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
-                label="Amount"
-                variant="modulation"
-              />
-            </div>
-          </div>
-
-          <div className={classes.knobsRow}>
-            <div className={classes.knobColumn}>
-              <Slider
+              <Knob
                 min={0.1}
                 max={20}
                 step={0.1}
                 value={lfo1.frequency}
                 onChange={(value) => { onLFOChange(1, 'frequency', value) }}
-                color="mfnCyan"
-                disabled={!lfo1.enabled}
-                formatDisplayValue={(value) => `${value.toFixed(1)} Hz`}
-                label="Frequency"
-                variant="parameter"
+                color="#5af"
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${value.toFixed(1)} Hz`}
               />
+              <Text className={classes.labelText}>Frequency</Text>
+            </div>
+
+            <div className={classes.knobColumn}>
+              <Knob
+                min={-1}
+                max={1}
+                step={0.01}
+                value={lfo1.amount}
+                onChange={(value) => { onLFOChange(1, 'amount', value) }}
+                color={lfo1.amount >= 0 ? "#5af" : "#f5a"}
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
+              />
+              <Text className={classes.labelText}>Amount</Text>
+              <Text className={classes.dimmedText}>+ up / - down</Text>
             </div>
           </div>
         </Box>
@@ -202,35 +171,34 @@ export function ModulationPanel({
 
           <div className={classes.knobsRow}>
             <div className={classes.knobColumn}>
-              <Slider
-                min={-1}
-                max={1}
-                step={0.01}
-                value={lfo2.amount}
-                onChange={(value) => { onLFOChange(2, 'amount', value) }}
-                color="mfnCyan"
-                disabled={!lfo2.enabled}
-                formatDisplayValue={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
-                label="Amount"
-                variant="modulation"
-              />
-            </div>
-          </div>
-
-          <div className={classes.knobsRow}>
-            <div className={classes.knobColumn}>
-              <Slider
+              <Knob
                 min={0.05}
                 max={10}
                 step={0.05}
                 value={lfo2.frequency}
                 onChange={(value) => { onLFOChange(2, 'frequency', value) }}
-                color="mfnCyan"
-                disabled={!lfo2.enabled}
-                formatDisplayValue={(value) => `${value.toFixed(2)} Hz`}
-                label="Frequency"
-                variant="parameter"
+                color="#5af"
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${value.toFixed(2)} Hz`}
               />
+              <Text className={classes.labelText}>Frequency</Text>
+            </div>
+
+            <div className={classes.knobColumn}>
+              <Knob
+                min={-1}
+                max={1}
+                step={0.01}
+                value={lfo2.amount}
+                onChange={(value) => { onLFOChange(2, 'amount', value) }}
+                color={lfo2.amount >= 0 ? "#5af" : "#f5a"}
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
+              />
+              <Text className={classes.labelText}>Amount</Text>
+              <Text className={classes.dimmedText}>+ up / - down</Text>
             </div>
           </div>
         </Box>
@@ -259,52 +227,53 @@ export function ModulationPanel({
             />
           </div>
 
-          <div className={classes.singleKnobRow}>
-            <div style={{ width: '100%' }}>
-              <Slider
-                min={-1}
-                max={1}
-                step={0.01}
-                value={env1.amount}
-                onChange={(value) => { onEnvChange(1, 'amount', value) }}
-                color="mfnCyan"
-                disabled={!env1.enabled}
-                formatDisplayValue={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
-                label="Amount"
-                variant="modulation"
-              />
-            </div>
-          </div>
-
           <div className={classes.knobsRow}>
             <div className={classes.knobColumn}>
-              <Slider
+              <Knob
                 min={0.001}
                 max={1}
                 step={0.001}
                 value={env1.attack}
                 onChange={(value) => { onEnvChange(1, 'attack', value) }}
-                color="mfnCyan"
-                disabled={!env1.enabled}
-                formatDisplayValue={(value) => `${(value * 1000).toFixed(0)} ms`}
-                label="Attack"
-                variant="parameter"
+                color="#5af"
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${(value * 1000).toFixed(0)} ms`}
               />
+              <Text className={classes.labelText}>Attack</Text>
             </div>
 
             <div className={classes.knobColumn}>
-              <Slider
+              <Knob
                 min={0.001}
                 max={2}
                 step={0.001}
                 value={env1.release}
                 onChange={(value) => { onEnvChange(1, 'release', value) }}
-                color="mfnCyan"
-                disabled={!env1.enabled}
-                formatDisplayValue={(value) => `${(value * 1000).toFixed(0)} ms`}
-                label="Release"
-                variant="parameter"
+                color="#5af"
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${(value * 1000).toFixed(0)} ms`}
               />
+              <Text className={classes.labelText}>Release</Text>
+            </div>
+          </div>
+
+          <div className={classes.singleKnobRow}>
+            <div>
+              <Knob
+                min={-1}
+                max={1}
+                step={0.01}
+                value={env1.amount}
+                onChange={(value) => { onEnvChange(1, 'amount', value) }}
+                color={env1.amount >= 0 ? "#5af" : "#f5a"}
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
+              />
+              <Text className={classes.labelText}>Amount</Text>
+              <Text className={classes.dimmedText}>+ up / - down</Text>
             </div>
           </div>
         </Box>
@@ -333,53 +302,83 @@ export function ModulationPanel({
             />
           </div>
 
-          <div className={classes.singleKnobRow}>
-            <div style={{ width: '100%' }}>
-              <Slider
-                min={-1}
-                max={1}
-                step={0.01}
-                value={env2.amount}
-                onChange={(value) => { onEnvChange(2, 'amount', value) }}
-                color="mfnCyan"
-                disabled={!env2.enabled}
-                formatDisplayValue={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
-                label="Amount"
-                variant="modulation"
-              />
-            </div>
-          </div>
-
           <div className={classes.knobsRow}>
             <div className={classes.knobColumn}>
-              <Slider
+              <Knob
                 min={0.001}
                 max={1}
                 step={0.001}
                 value={env2.attack}
                 onChange={(value) => { onEnvChange(2, 'attack', value) }}
-                color="mfnCyan"
-                disabled={!env2.enabled}
-                formatDisplayValue={(value) => `${(value * 1000).toFixed(0)} ms`}
-                label="Attack"
-                variant="parameter"
+                color="#5af"
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${(value * 1000).toFixed(0)} ms`}
               />
+              <Text className={classes.labelText}>Attack</Text>
             </div>
 
             <div className={classes.knobColumn}>
-              <Slider
+              <Knob
                 min={0.001}
                 max={2}
                 step={0.001}
                 value={env2.release}
                 onChange={(value) => { onEnvChange(2, 'release', value) }}
-                color="mfnCyan"
-                disabled={!env2.enabled}
-                formatDisplayValue={(value) => `${(value * 1000).toFixed(0)} ms`}
-                label="Release"
-                variant="parameter"
+                color="#5af"
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${(value * 1000).toFixed(0)} ms`}
               />
+              <Text className={classes.labelText}>Release</Text>
             </div>
+          </div>
+
+          <div className={classes.singleKnobRow}>
+            <div>
+              <Knob
+                min={-1}
+                max={1}
+                step={0.01}
+                value={env2.amount}
+                onChange={(value) => { onEnvChange(2, 'amount', value) }}
+                color={env2.amount >= 0 ? "#5af" : "#f5a"}
+                bgcolor="#222"
+                variant="small"
+                label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
+              />
+              <Text className={classes.labelText}>Amount</Text>
+              <Text className={classes.dimmedText}>+ up / - down</Text>
+            </div>
+          </div>
+        </Box>
+
+        {/* Chaos Control */}
+        <Box className={classes.chaosSection}>
+          <Tooltip label="Chaos increases modulation intensity and adds randomness">
+            <Text fw={500} className={classes.modulationTitle}>Chaos</Text>
+          </Tooltip>
+
+          <div className={classes.chaosKnob}>
+            <Knob
+              min={0}
+              max={100}
+              step={1}
+              value={chaosValue}
+              onChange={onChaosChange}
+              color={getChaosColor(chaosValue)}
+              bgcolor="#222"
+              variant="small"
+              label={(value) => `${value}%`}
+            />
+          </div>
+
+          <div className={classes.chaosLabels}>
+            <Text>None</Text>
+            <Text>Mild</Text>
+            <Text>Med</Text>
+            <Text>High</Text>
+            <Text>X</Text>
           </div>
         </Box>
       </div>

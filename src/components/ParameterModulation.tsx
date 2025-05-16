@@ -1,6 +1,7 @@
 import { Button, Tooltip, Text } from '@mantine/core';
 import { type ButtonProps } from '@mantine/core';
-import { Knob } from './Controls/Knob';
+import classNames from 'classnames';
+import { Slider } from './Controls/Slider';
 import classes from './ParameterModulation.module.css';
 
 interface ModulationButtonProps extends Omit<ButtonProps, 'onChange'> {
@@ -38,6 +39,30 @@ export function ModulationButton({
 
   return (
     <div className={classes.modulationButtonWithKnob}>
+      {showAmount && onAmountChange && (
+        <div className={classNames(classes.knobContainer, { [classes.inactiveKnob]: !active })}>
+          <Slider
+            min={-1}
+            max={1}
+            step={0.01}
+            value={amount}
+            onChange={onAmountChange}
+            color={active ? color : 'gray'}
+            variant="modulation"
+            disabled={!active || disabled}
+            showLabel={false}
+            formatDisplayValue={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
+            size="sm"
+          />
+          <Text size="xs" ta="center" className={classes.modulationLabel}>Amount</Text>
+          {amount !== 0 && (
+            <Text size="xs" ta="center" c="dimmed" className={classes.modulationLabelInfo}>
+              {amount > 0 ? 'Raises' : 'Lowers'} values
+            </Text>
+          )}
+        </div>
+      )}
+
       <Tooltip label={`${label} modulation ${active ? 'enabled' : 'disabled'}`} withArrow>
         <Button
           variant={active ? 'filled' : 'outline'}
@@ -50,29 +75,6 @@ export function ModulationButton({
           {label}
         </Button>
       </Tooltip>
-
-      {showAmount && onAmountChange && (
-        <div className={`${classes.knobContainer} ${!active ? classes.inactiveKnob : ''}`}>
-          <Knob
-            min={-1}
-            max={1}
-            step={0.01}
-            value={amount}
-            onChange={onAmountChange}
-            color={active ? (amount >= 0 ? color : 'pink') : '#555'}
-            bgcolor="#222"
-            variant="small"
-            label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
-            disabled={!active || disabled}
-          />
-          <Text size="xs" ta="center" className={classes.modulationLabel}>Amount</Text>
-          {amount !== 0 && (
-            <Text size="xs" ta="center" c="dimmed" className={classes.modulationLabelInfo}>
-              {amount > 0 ? 'Raises' : 'Lowers'} values
-            </Text>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -30,7 +30,7 @@ const mfnOrange: MantineColorsTuple = [
 
 export const theme = createTheme({
   fontFamily: "'Space Grotesk', sans-serif",
-  fontFamilyMonospace: "'VT323', monospace",
+  fontFamilyMonospace: "'Space Mono', monospace",
   primaryColor: 'mfnCyan',
   colors: {
     mfnCyan,
