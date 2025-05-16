@@ -1,8 +1,8 @@
-import { Box, Flex, Group, Select, Text, Tooltip } from '@mantine/core';
+import { Box, Flex, Group, Stack, Select, Text, Tooltip } from '@mantine/core';
 import { IconWaveSine, IconWaveSquare, IconWaveSawTool } from '@tabler/icons-react';
 import type { LFOWaveformType } from '../audio/schema';
-import { Knob } from './InputControls/Knob';
-import { Switch } from './InputControls/Switch';
+import { Knob } from './Controls/Knob';
+import { Switch } from './Controls/Switch';
 import classes from './ModulationPanel.module.css';
 
 interface ModulationPanelProps {
@@ -97,7 +97,6 @@ export function ModulationPanel({
             <Switch
               checked={lfo1.enabled}
               onChange={(checked) => { onLFOChange(1, 'enabled', checked) }}
-              label="Enabled"
               variant="led"
             />
           </Flex>
@@ -115,38 +114,40 @@ export function ModulationPanel({
             />
           </Flex>
 
-          <div className={classes.knobsRow}>
-            <div className={classes.knobColumn}>
-              <Knob
-                min={0.1}
-                max={20}
-                step={0.1}
-                value={lfo1.frequency}
-                onChange={(value) => { onLFOChange(1, 'frequency', value) }}
-                color="#5af"
-                bgcolor="#222"
-                variant="small"
-                label={(value) => `${value.toFixed(1)} Hz`}
-              />
-              <Text size="xs" ta="center" mt={5}>Frequency</Text>
-            </div>
+          <Stack>
+            <Group>
+              <div>
+                <Knob
+                  min={0.1}
+                  max={20}
+                  step={0.1}
+                  value={lfo1.frequency}
+                  onChange={(value) => { onLFOChange(1, 'frequency', value) }}
+                  color="#5af"
+                  bgcolor="#222"
+                  variant="small"
+                  label={(value) => `${value.toFixed(1)} Hz`}
+                />
+                <Text size="xs" ta="center" mt={5}>Frequency</Text>
+              </div>
 
-            <div className={classes.knobColumn}>
-              <Knob
-                min={-1}
-                max={1}
-                step={0.01}
-                value={lfo1.amount}
-                onChange={(value) => { onLFOChange(1, 'amount', value) }}
-                color={lfo1.amount >= 0 ? "#5af" : "#f5a"}
-                bgcolor="#222"
-                variant="small"
-                label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
-              />
-              <Text size="xs" ta="center" mt={5}>Amount</Text>
-              <Text size="xs" c="dimmed" ta="center">+ up / - down</Text>
-            </div>
-          </div>
+              <div className={classes.knobColumn}>
+                <Knob
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  value={lfo1.amount}
+                  onChange={(value) => { onLFOChange(1, 'amount', value) }}
+                  color={lfo1.amount >= 0 ? "#5af" : "#f5a"}
+                  bgcolor="#222"
+                  variant="small"
+                  label={(value) => `${value >= 0 ? '+' : ''}${Math.round(value * 100)}%`}
+                />
+                <Text size="xs" ta="center" mt={5}>Amount</Text>
+                <Text size="xs" c="dimmed" ta="center">+ up / - down</Text>
+              </div>
+            </Group>
+          </Stack>
         </Box>
 
         {/* LFO 2 Controls */}

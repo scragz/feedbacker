@@ -1,0 +1,55 @@
+.ui-knob-shadow {
+  -moz-box-shadow: 0px 4px 10px rgba(0,0,0,.5);
+  -webkit-box-shadow: 0px 4px 10px rgba(0,0,0,.5);
+  box-shadow: 0px 4px 10px rgba(0,0,0,.5);
+}
+
+/* Updated knob styles */
+.knob {
+  position: relative;
+  display: inline-block;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 50%;
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  background-image: linear-gradient(to bottom, #333333, #222222);
+  border: 1px solid #444;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorStr='#333333', EndColorStr='#222222');
+}
+
+.knob::-webkit-slider-thumb {
+  visibility: hidden;
+}
+
+.knob::-moz-range-thumb {
+  visibility: hidden;
+}
+
+.knob-container {
+  display: inline-block;
+  position: relative;
+  user-select: none;
+}
+
+.knob-label {
+  margin-top: 5px;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.knob-indicator {
+  position: absolute;
+  background-color: #f00;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Style to reflect disabled state */
+.knob[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorStr='#333333', EndColorStr='#222222');
+}

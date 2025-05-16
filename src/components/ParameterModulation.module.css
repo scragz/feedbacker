@@ -1,16 +1,9 @@
-.modulationContainer {
+.container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 5px 0;
-}
-
-.modulationButtonGroup {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
   gap: 8px;
-  margin-top: 5px;
+  margin: 5px 0;
 }
 
 .modulationButtonWithKnob {

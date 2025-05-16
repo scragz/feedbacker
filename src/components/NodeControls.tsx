@@ -1,15 +1,15 @@
 import React from 'react';
 import { Button, Group } from '@mantine/core'; // Using Mantine Button
-import classes from './Controls.module.css';
+import classes from './NodeControls.module.css';
 import type { NodeType } from '../audio/schema';
 
-export interface ControlsProps {
+export interface NodeControlsProps {
   onAddNode: (type: NodeType) => void;
   audioContextState: AudioContextState | null;
   onAudioResume: () => void;
 }
 
-const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAudioResume }) => {
+const NodeControls: React.FC<NodeControlsProps> = ({ onAddNode, audioContextState, onAudioResume }) => {
   const addGainNode = () => {
     onAddNode('gain');
   };
@@ -66,4 +66,4 @@ const Controls: React.FC<ControlsProps> = ({ onAddNode, audioContextState, onAud
   );
 };
 
-export default Controls;
+export default NodeControls;

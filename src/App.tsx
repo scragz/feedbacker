@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { nanoid } from 'nanoid';
-import { MantineProvider, Stack, LoadingOverlay, ScrollArea, Modal } from '@mantine/core';
+import { MantineProvider, Stack, LoadingOverlay, ScrollArea } from '@mantine/core';
 import { theme } from './theme';
-import Controls from './components/Controls';
+import NodeControls from './components/NodeControls';
 import NodeList from './components/NodeList';
 import NodeInspector from './components/NodeInspector';
 import StatusDisplay from './components/StatusDisplay';
@@ -572,7 +572,7 @@ function App() {
             onEnvChange={handleEnvelopeFollowerChange}
             onChaosChange={handleChaosChange}
           />
-          <Controls
+          <NodeControls
             onAddNode={handleAddNode}
             onAudioResume={() => void handleResumeAudio()} // Ensure void return
             audioContextState={audioContextState}

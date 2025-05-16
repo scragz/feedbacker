@@ -1,0 +1,136 @@
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 22px;
+  vertical-align: middle;
+  margin: 0 10px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switchSlider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #333;
+  -webkit-transition: .2s;
+  transition: .2s;
+  border-radius: 22px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(255, 255, 255, 0.1);
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorStr='#333333', EndColorStr='#222222');
+}
+
+.switchSlider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  -webkit-transition: .2s;
+  transition: .2s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+input:checked + .switchSlider {
+  background-color: #2196F3;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 5px rgba(33, 150, 243, 0.5);
+}
+
+input:focus + .switchSlider {
+  box-shadow: 0 0 1px #2196F3, inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+input:checked + .switchSlider:before {
+  -webkit-transform: translateX(22px);
+  -ms-transform: translateX(22px);
+  transform: translateX(22px);
+}
+
+.switchLabel {
+  margin-top: 5px;
+  font-size: 0.8rem;
+  text-align: center;
+  color: #ddd;
+}
+
+.switchContainer {
+  display: inline-block;
+  text-align: center;
+  margin: 0 5px;
+  padding: 5px;
+}
+
+/* Disabled state */
+input:disabled + .switchSlider {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorStr='#333333', EndColorStr='#222222');
+}
+
+/* Variants - can customize with different styles */
+.switchMetal .switchSlider {
+  background-color: #333;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.switchMetal input:checked + .switchSlider {
+  background-color: #555;
+}
+
+.switchGranite .switchSlider {
+  background-color: #888;
+}
+
+.switchLed .switchSlider {
+  background-color: #222;
+  border: 1px solid #444;
+}
+
+.switchLed input:checked + .switchSlider {
+  background-color: #222;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 8px rgba(255, 85, 85, 0.7);
+}
+
+.switchLed input:checked + .switchSlider:before {
+  background-color: #f55;
+  box-shadow: 0 0 5px rgba(255, 85, 85, 0.7);
+}
+
+.switchPower .switchSlider {
+  background-color: #666;
+}
+
+.switchPower input:checked + .switchSlider {
+  background-color: #4CAF50;
+}
+
+.switchRecord .switchSlider {
+  background-color: #555;
+}
+
+.switchRecord input:checked + .switchSlider {
+  background-color: #f44336;
+}
+
+.switchRecord input:checked + .switchSlider:before {
+  background-color: #fff;
+}
+
+.switchSlide .switchSlider {
+  background-color: #444;
+}
+
+.switchSlide input:checked + .switchSlider {
+  background-color: #2196F3;
+}

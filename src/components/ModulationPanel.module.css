@@ -1,16 +1,3 @@
-.knobsRow {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 15px;
-}
-
-.knobColumn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 48%;
-}
-
 .chaosKnob {
   width: 100%;
   display: flex;

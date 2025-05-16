@@ -1,7 +1,7 @@
 import { Button, Tooltip, Text } from '@mantine/core';
 import { type ButtonProps } from '@mantine/core';
-import { Knob } from './InputControls/Knob';
-import classes from './ModulationButton.module.css';
+import { Knob } from './Controls/Knob';
+import classes from './ParameterModulation.module.css';
 
 interface ModulationButtonProps extends Omit<ButtonProps, 'onChange'> {
   label: string;
@@ -80,7 +80,7 @@ export function ModulationButton({
 /**
  * A group of modulation buttons (LFO1, LFO2, ENV1, ENV2)
  */
-export function ModulationButtonGroup({
+export function ParameterModulation({
   parameter,
   modulation,
   onModulationChange,
@@ -112,7 +112,7 @@ export function ModulationButtonGroup({
   const env2Amount = modulation?.env2?.amount ?? 0;
 
   return (
-    <div className={classes.modulationButtonGroup}>
+    <div className={classes.container}>
       <ModulationButton
         label="LFO1"
         active={lfo1Active}
@@ -157,4 +157,4 @@ export function ModulationButtonGroup({
   );
 }
 
-export default ModulationButtonGroup;
+export default ParameterModulation;

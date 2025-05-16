@@ -6,10 +6,10 @@ import {
   NODE_PARAMETER_DEFINITIONS,
   type ParameterDefinition,
 } from '../audio/schema';
-import { ModulationButtonGroup } from './ModulationButton';
+import { ParameterModulation } from './ParameterModulation';
 import classes from './NodeInspector.module.css';
-import { Knob } from './InputControls/Knob';
-import { Switch } from './InputControls/Switch';
+import { Knob } from './Controls/Knob';
+import { Switch } from './Controls/Switch';
 
 interface NodeInspectorProps {
   selectedNode: AudioNodeInstance | null;
@@ -62,9 +62,6 @@ export function NodeInspector({
           // Determine if it's a main parameter (use large knob) or a secondary parameter
           const isMainParameter = MAIN_PARAMETERS.includes(paramId);
 
-          // Choose the knob size based on parameter importance
-          const knobVariant = isMainParameter ? 'medium' : 'small';
-
           // Set knob colors based on parameter type
           const knobColor = isMainParameter ? '#f55' : '#5af';
 
@@ -96,7 +93,6 @@ export function NodeInspector({
                     }}
                     color={knobColor}
                     bgcolor="#222"
-                    variant={isMainParameter ? 'medium' : 'small'}
                     label={(value) => {
                       // Apply appropriate formatting based on parameter definition
                       let formattedValue = '';
@@ -132,7 +128,7 @@ export function NodeInspector({
                 </Text>
               )}
               {(paramDef.type === 'float' || paramDef.type === 'integer') && onModulationChange && (
-                <ModulationButtonGroup
+                <ParameterModulation
                   parameter={paramId}
                   modulation={selectedNode.modulation?.[paramId]}
                   onModulationChange={(paramId, source, enabled, amount) => {
