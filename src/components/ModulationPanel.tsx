@@ -160,9 +160,9 @@ export function ModulationPanel({
           <div className={classes.knobsRow}>
             <div className={classes.knobColumn}>
               <Slider
-                min={0.1}
-                max={20}
-                step={0.1}
+                min={1}
+                max={10000}
+                step={1}
                 value={lfo1.frequency}
                 onChange={(value) => { onLFOChange(1, 'frequency', value) }}
                 color="mfnCyan"
@@ -217,9 +217,9 @@ export function ModulationPanel({
           <div className={classes.knobsRow}>
             <div className={classes.knobColumn}>
               <Slider
-                min={0.05}
-                max={10}
-                step={0.05}
+                min={1}
+                max={10000}
+                step={1}
                 value={lfo2.frequency}
                 onChange={(value) => { onLFOChange(2, 'frequency', value) }}
                 color="mfnCyan"

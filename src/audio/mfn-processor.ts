@@ -94,11 +94,15 @@ class MfnProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // Initialize global LFOs and envelope followers
-    this.lfo1 = new LFOProcessor(1, 'sine', 1, this.sampleRateInternal); // Changed amount from 0 to 1
-    this.lfo2 = new LFOProcessor(0.5, 'triangle', 1, this.sampleRateInternal); // Changed amount from 0 to 1
-    this.envelopeFollower1 = new EnvelopeFollower(0.01, 0.1, 1, this.sampleRateInternal); // Changed amount from 0 to 1
-    this.envelopeFollower2 = new EnvelopeFollower(0.05, 0.5, 1, this.sampleRateInternal); // Changed amount from 0 to 1
+    // Initialize global LFOs and envelope followers with default settings
+    this.lfo1 = new LFOProcessor(1, 'sine', 1, this.sampleRateInternal);
+    this.lfo2 = new LFOProcessor(0.5, 'triangle', 1, this.sampleRateInternal);
+    this.envelopeFollower1 = new EnvelopeFollower(0.01, 0.1, 1, this.sampleRateInternal);
+    this.envelopeFollower2 = new EnvelopeFollower(0.05, 0.5, 1, this.sampleRateInternal);
+
+    // Initialize LFO values
+    this.lfo1Value = this.lfo1.process();
+    this.lfo2Value = this.lfo2.process();
 
     this.port.onmessage = this.handleMessage.bind(this);
     console.log('[MFNProcessor] Initialized. Sample Rate:', this.sampleRateInternal, 'Max Channels:', this.maxOutputChannels);
@@ -158,6 +162,10 @@ class MfnProcessor extends AudioWorkletProcessor {
       this.lfo1.setWaveform(this.graph.lfo1.waveform);
       this.lfo1.setAmount(this.graph.lfo1.amount);
       this.lfo1.setEnabled(this.graph.lfo1.enabled);
+      // Update LFO value immediately
+      if (this.graph.lfo1.enabled) {
+        this.lfo1Value = this.lfo1.process();
+      }
     }
 
     if (this.graph.lfo2) {
@@ -165,6 +173,10 @@ class MfnProcessor extends AudioWorkletProcessor {
       this.lfo2.setWaveform(this.graph.lfo2.waveform);
       this.lfo2.setAmount(this.graph.lfo2.amount);
       this.lfo2.setEnabled(this.graph.lfo2.enabled);
+      // Update LFO value immediately
+      if (this.graph.lfo2.enabled) {
+        this.lfo2Value = this.lfo2.process();
+      }
     }
 
     // Configure envelope followers from graph settings
@@ -188,6 +200,12 @@ class MfnProcessor extends AudioWorkletProcessor {
     this.isInitialized = true;
     // Though PROCESSOR_READY doesn't send the graph, let's log what the graph state is after init.
     console.log('[MFNProcessor] After _initProcessor, graph nodes count:', this.graph.nodes.length);
+    console.log('[MFNProcessor] LFO1:', {
+      frequency: this.graph.lfo1?.frequency,
+      enabled: this.graph.lfo1?.enabled,
+      amount: this.graph.lfo1?.amount,
+      currentValue: this.lfo1Value
+    });
     this.port.postMessage({ type: WorkletMessageType.PROCESSOR_READY });
     console.log('[MFNProcessor] Processor ready.');
   }
@@ -200,6 +218,64 @@ class MfnProcessor extends AudioWorkletProcessor {
       this.graph = payload.graph;
     }
     console.log('[MFNProcessor] Updating graph with payload:', payload.graph);
+
+    // IMPORTANT FIX: Update chaos value from graph
+    this.chaosValue = this.graph.chaosLevel ?? 0;
+
+    // IMPORTANT FIX: Update LFO and envelope follower processors with values from the updated graph
+    // This ensures parameter changes like frequency are properly applied to the audio processors
+
+    // Update LFO1 parameters
+    if (this.graph.lfo1) {
+      this.lfo1.setFrequency(this.graph.lfo1.frequency);
+      this.lfo1.setWaveform(this.graph.lfo1.waveform);
+      this.lfo1.setAmount(this.graph.lfo1.amount);
+      this.lfo1.setEnabled(this.graph.lfo1.enabled);
+
+      // Update LFO value immediately if enabled
+      if (this.graph.lfo1.enabled) {
+        this.lfo1Value = this.lfo1.process();
+      }
+
+      console.log(`[MFNProcessor] Updated LFO1 in _updateGraph - frequency: ${this.graph.lfo1.frequency}, enabled: ${this.graph.lfo1.enabled}, amount: ${this.graph.lfo1.amount}`);
+    }
+
+    // Update LFO2 parameters
+    if (this.graph.lfo2) {
+      this.lfo2.setFrequency(this.graph.lfo2.frequency);
+      this.lfo2.setWaveform(this.graph.lfo2.waveform);
+      this.lfo2.setAmount(this.graph.lfo2.amount);
+      this.lfo2.setEnabled(this.graph.lfo2.enabled);
+
+      // Update LFO value immediately if enabled
+      if (this.graph.lfo2.enabled) {
+        this.lfo2Value = this.lfo2.process();
+      }
+
+      console.log(`[MFNProcessor] Updated LFO2 in _updateGraph - frequency: ${this.graph.lfo2.frequency}, enabled: ${this.graph.lfo2.enabled}, amount: ${this.graph.lfo2.amount}`);
+    }
+
+    // Update envelope followers
+    if (this.graph.envelopeFollower1) {
+      this.envelopeFollower1.setAttackTime(this.graph.envelopeFollower1.attack, this.sampleRateInternal);
+      this.envelopeFollower1.setReleaseTime(this.graph.envelopeFollower1.release, this.sampleRateInternal);
+      this.envelopeFollower1.setAmount(this.graph.envelopeFollower1.amount);
+      this.envelopeFollower1.setEnabled(this.graph.envelopeFollower1.enabled);
+      this.envelopeFollower1.setSource(this.graph.envelopeFollower1.source);
+
+      console.log(`[MFNProcessor] Updated EnvelopeFollower1 in _updateGraph - attack: ${this.graph.envelopeFollower1.attack}, release: ${this.graph.envelopeFollower1.release}, amount: ${this.graph.envelopeFollower1.amount}`);
+    }
+
+    if (this.graph.envelopeFollower2) {
+      this.envelopeFollower2.setAttackTime(this.graph.envelopeFollower2.attack, this.sampleRateInternal);
+      this.envelopeFollower2.setReleaseTime(this.graph.envelopeFollower2.release, this.sampleRateInternal);
+      this.envelopeFollower2.setAmount(this.graph.envelopeFollower2.amount);
+      this.envelopeFollower2.setEnabled(this.graph.envelopeFollower2.enabled);
+      this.envelopeFollower2.setSource(this.graph.envelopeFollower2.source);
+
+      console.log(`[MFNProcessor] Updated EnvelopeFollower2 in _updateGraph - attack: ${this.graph.envelopeFollower2.attack}, release: ${this.graph.envelopeFollower2.release}, amount: ${this.graph.envelopeFollower2.amount}`);
+    }
+
     this._buildGraphInternals();
     console.log('[MFNProcessor] After _updateGraph and _buildGraphInternals, sending GRAPH_UPDATED. Nodes count:', this.graph.nodes.length, 'Node IDs:', this.graph.nodes.map(n => n.id).join(', '));
     this.port.postMessage({ type: WorkletMessageType.GRAPH_UPDATED, payload: this.graph });
@@ -427,6 +503,7 @@ class MfnProcessor extends AudioWorkletProcessor {
         console.log(`[MFNProcessor] Master gain updated to ${value}.`);
     } else if (parameterId === 'chaos' && typeof value === 'number') {
         this.chaosValue = value;
+        this.graph.chaosLevel = value; // Make sure graph state is also updated
         console.log(`[MFNProcessor] Chaos value updated to ${this.chaosValue}.`);
     }
     // Handle LFO1 parameters
@@ -436,7 +513,11 @@ class MfnProcessor extends AudioWorkletProcessor {
         if (lfoParam === 'frequency' && typeof value === 'number') {
             this.lfo1.setFrequency(value);
             this.graph.lfo1.frequency = value;
-            console.log(`[MFNProcessor] LFO1 frequency updated to ${value}`);
+            // Process immediately to update the LFO value
+            if (this.lfo1.isEnabled()) {
+                this.lfo1Value = this.lfo1.process();
+            }
+            console.log(`[MFNProcessor] LFO1 frequency updated to ${value}, current LFO1 value: ${this.lfo1Value}`);
         } else if (lfoParam === 'waveform' && typeof value === 'string') {
             // Validate and type cast the waveform value
             const validWaveforms: LFOWaveformType[] = ['sine', 'square', 'triangle', 'sawtooth', 'random'];
@@ -444,22 +525,34 @@ class MfnProcessor extends AudioWorkletProcessor {
                 const waveform = value as LFOWaveformType;
                 this.lfo1.setWaveform(waveform);
                 this.graph.lfo1.waveform = waveform;
+                // Process immediately to update the LFO value after waveform change
+                if (this.lfo1.isEnabled()) {
+                    this.lfo1Value = this.lfo1.process();
+                }
                 console.log(`[MFNProcessor] LFO1 waveform updated to ${waveform}`);
             } else {
                 console.warn(`[MFNProcessor] Invalid LFO1 waveform value: ${value}. Using default 'sine'.`);
                 this.lfo1.setWaveform('sine');
                 this.graph.lfo1.waveform = 'sine';
+                if (this.lfo1.isEnabled()) {
+                    this.lfo1Value = this.lfo1.process();
+                }
             }
         } else if (lfoParam === 'amount' && typeof value === 'number') {
             this.lfo1.setAmount(value);
             this.graph.lfo1.amount = value;
-            console.log(`[MFNProcessor] LFO1 amount updated to ${value}`);
+            console.log(`[MFNProcessor] LFO1 amount updated to ${value}, enabled: ${this.lfo1.isEnabled()}`);
         } else if (lfoParam === 'enabled' && typeof value === 'boolean') {
             this.lfo1.setEnabled(value);
             this.graph.lfo1.enabled = value;
             console.log(`[MFNProcessor] LFO1 enabled state updated to ${value}`);
         } else {
             console.warn(`[MFNProcessor] Unknown LFO1 parameter: ${lfoParam}`);
+        }
+
+        // Force an immediate update of the LFO value if enabled
+        if (this.lfo1.isEnabled()) {
+            this.lfo1Value = this.lfo1.process();
         }
     }
     // Handle LFO2 parameters
@@ -469,21 +562,46 @@ class MfnProcessor extends AudioWorkletProcessor {
         if (lfoParam === 'frequency' && typeof value === 'number') {
             this.lfo2.setFrequency(value);
             this.graph.lfo2.frequency = value;
-            console.log(`[MFNProcessor] LFO2 frequency updated to ${value}`);
+            // Process immediately to update the LFO value
+            if (this.lfo2.isEnabled()) {
+                this.lfo2Value = this.lfo2.process();
+            }
+            console.log(`[MFNProcessor] LFO2 frequency updated to ${value}, current LFO2 value: ${this.lfo2Value}`);
         } else if (lfoParam === 'waveform' && typeof value === 'string') {
-            this.lfo2.setWaveform(value as LFOWaveformType);
-            this.graph.lfo2.waveform = value as LFOWaveformType;
-            console.log(`[MFNProcessor] LFO2 waveform updated to ${value}`);
+            // Validate and type cast the waveform value
+            const validWaveforms: LFOWaveformType[] = ['sine', 'square', 'triangle', 'sawtooth', 'random'];
+            if (validWaveforms.includes(value as LFOWaveformType)) {
+                const waveform = value as LFOWaveformType;
+                this.lfo2.setWaveform(waveform);
+                this.graph.lfo2.waveform = waveform;
+                // Process immediately to update the LFO value after waveform change
+                if (this.lfo2.isEnabled()) {
+                    this.lfo2Value = this.lfo2.process();
+                }
+                console.log(`[MFNProcessor] LFO2 waveform updated to ${waveform}`);
+            } else {
+                console.warn(`[MFNProcessor] Invalid LFO2 waveform value: ${value}. Using default 'sine'.`);
+                this.lfo2.setWaveform('sine');
+                this.graph.lfo2.waveform = 'sine';
+                if (this.lfo2.isEnabled()) {
+                    this.lfo2Value = this.lfo2.process();
+                }
+            }
         } else if (lfoParam === 'amount' && typeof value === 'number') {
             this.lfo2.setAmount(value);
             this.graph.lfo2.amount = value;
-            console.log(`[MFNProcessor] LFO2 amount updated to ${value}`);
+            console.log(`[MFNProcessor] LFO2 amount updated to ${value}, enabled: ${this.lfo2.isEnabled()}`);
         } else if (lfoParam === 'enabled' && typeof value === 'boolean') {
             this.lfo2.setEnabled(value);
             this.graph.lfo2.enabled = value;
             console.log(`[MFNProcessor] LFO2 enabled state updated to ${value}`);
         } else {
             console.warn(`[MFNProcessor] Unknown LFO2 parameter: ${lfoParam}`);
+        }
+
+        // Force an immediate update of the LFO value if enabled
+        if (this.lfo2.isEnabled()) {
+            this.lfo2Value = this.lfo2.process();
         }
     }
     // Handle envelope follower parameters (can be expanded if needed)
@@ -497,29 +615,74 @@ class MfnProcessor extends AudioWorkletProcessor {
             if (modParam === 'attack' && typeof value === 'number') {
                 modulator.setAttackTime(value, this.sampleRateInternal);
                 graphModulator.attack = value;
-                console.log(`[MFNProcessor] ${modId} attack updated to ${value}`);
+                // Log detailed information about the update
+                console.log(`[MFNProcessor] ${modId} attack updated to ${value}, sample rate: ${this.sampleRateInternal}, current value: ${modulator.getCurrentValue()}`);
             } else if (modParam === 'release' && typeof value === 'number') {
                 modulator.setReleaseTime(value, this.sampleRateInternal);
                 graphModulator.release = value;
-                console.log(`[MFNProcessor] ${modId} release updated to ${value}`);
+                // Log detailed information about the update
+                console.log(`[MFNProcessor] ${modId} release updated to ${value}, sample rate: ${this.sampleRateInternal}, current value: ${modulator.getCurrentValue()}`);
             } else if (modParam === 'amount' && typeof value === 'number') {
                 modulator.setAmount(value);
                 graphModulator.amount = value;
-                console.log(`[MFNProcessor] ${modId} amount updated to ${value}`);
+                // Log detailed information about the update
+                console.log(`[MFNProcessor] ${modId} amount updated to ${value}, enabled: ${modulator.isEnabled()}, current value: ${modulator.getCurrentValue()}`);
             } else if (modParam === 'enabled' && typeof value === 'boolean') {
                 modulator.setEnabled(value);
                 graphModulator.enabled = value;
-                console.log(`[MFNProcessor] ${modId} enabled updated to ${value}`);
+                // Log detailed information about the update
+                console.log(`[MFNProcessor] ${modId} enabled updated to ${value}, current value: ${modulator.getCurrentValue()}`);
             } else if (modParam === 'source' && typeof value === 'string') {
                 modulator.setSource(value);
                 graphModulator.source = value;
-                console.log(`[MFNProcessor] ${modId} source updated to ${value}`);
+                // Log detailed information about the update
+                console.log(`[MFNProcessor] ${modId} source updated to ${value}, current source: ${modulator.isForSource(value)}`);
             } else {
                 console.warn(`[MFNProcessor] Unknown ${modId} parameter: ${modParam}`);
             }
         }
+
+        // Add a special case for _setGlobalParameter to ensure immediate effect
+        // for envelope follower parameter changes
+        if (parameterId.startsWith('envelopeFollower')) {
+            // If we're processing an envelope follower parameter, add a hook to the end of
+            // the envelope follower section that will force an immediate update of any
+            // ongoing processing for that follower
+
+            const [modId, modParam] = parameterId.split('.');
+            const modulator = modId === 'envelopeFollower1' ? this.envelopeFollower1 : this.envelopeFollower2;
+
+            // Immediately process at least one sample to make sure parameters take effect
+            // This helps ensure that attack and release rates are correctly reflected
+            if (modulator.isEnabled() && (modParam === 'attack' || modParam === 'release')) {
+                // Use a small sample value (0.1) to test/update the envelope follower state
+                // This won't be audible but will cause the coefficients to be recalculated
+                modulator.process(0.1);
+                console.log(`[MFNProcessor] Forced immediate update of ${modId} after ${modParam} change, current value: ${modulator.getCurrentValue().toFixed(4)}`);
+            }
+        }
     } else {
         console.warn(`[MFNProcessor] Unknown global parameter: ${parameterId}`);
+    }
+
+    // Use the existing parameter updated message type
+    this.port.postMessage({
+        type: WorkletMessageType.PARAMETER_UPDATED,
+        payload: { nodeId: 'global', parameterId, value }
+    });
+
+    // Special handling for envelope follower parameters to ensure immediate effect
+    if (parameterId.startsWith('envelopeFollower')) {
+        const [modId, modParam] = parameterId.split('.');
+        const modulator = modId === 'envelopeFollower1' ? this.envelopeFollower1 : this.envelopeFollower2;
+
+        // Immediately process a sample to make sure parameters take effect
+        // This helps ensure that attack and release rates are correctly reflected
+        if (modulator.isEnabled() && (modParam === 'attack' || modParam === 'release')) {
+            // Use a small sample value (0.1) to test/update the envelope follower state
+            modulator.process(0.1);
+            console.log(`[MFNProcessor] Forced immediate update of ${modId} after ${modParam} change, current value: ${modulator.getCurrentValue().toFixed(4)}`);
+        }
     }
   }
 
@@ -553,6 +716,11 @@ class MfnProcessor extends AudioWorkletProcessor {
          !this.envelopeFollower1.isEnabled() &&
          !this.envelopeFollower2.isEnabled())) {
       return modulated;
+    }
+
+    // Debug log when modulation is active (throttled)
+    if (this.logCounter % (this.logThrottle * 10) === 0) {
+      console.log(`[MFNProcessor] Calculating modulation for node ${node.id}. LFO1=${this.lfo1Value.toFixed(3)}, LFO2=${this.lfo2Value.toFixed(3)}, ENV1=${this.envelopeFollower1.getCurrentValue().toFixed(3)}, ENV2=${this.envelopeFollower2.getCurrentValue().toFixed(3)}`);
     }
 
     // Get current modulator values
@@ -754,22 +922,28 @@ class MfnProcessor extends AudioWorkletProcessor {
         }
       }
 
-      // Process global LFOs and envelope followers
-      if (this.lfo1.isEnabled()) {
-        this.lfo1Value = this.lfo1.process();
-      } else {
-        this.lfo1Value = 0; // Ensure zero value when disabled
-      }
+      // Process global LFOs at the start of each processing block
+      // The LFO values should be updated regardless of whether they're used in the current node
+      // This ensures consistent modulation across all nodes in the graph
+      if (destNodeOrderIdx === 0) { // Only process once per audio block
+        // Process LFO1
+        if (this.lfo1.isEnabled()) {
+          this.lfo1Value = this.lfo1.process();
+        } else {
+          this.lfo1Value = 0; // Ensure zero value when disabled
+        }
 
-      if (this.lfo2.isEnabled()) {
-        this.lfo2Value = this.lfo2.process();
-      } else {
-        this.lfo2Value = 0; // Ensure zero value when disabled
-      }
+        // Process LFO2
+        if (this.lfo2.isEnabled()) {
+          this.lfo2Value = this.lfo2.process();
+        } else {
+          this.lfo2Value = 0; // Ensure zero value when disabled
+        }
 
-      // Log modulator values occasionally for debugging
-      if (this.logCounter % (this.logThrottle * 5) === 0) {
-        console.log(`[MFNProcessor] Modulators: LFO1=${this.lfo1Value.toFixed(3)} (enabled=${this.lfo1.isEnabled()}, amount=${this.graph.lfo1?.amount}), LFO2=${this.lfo2Value.toFixed(3)}`);
+        // Log modulator values occasionally for debugging
+        if (this.logCounter % (this.logThrottle * 5) === 0) {
+          console.log(`[MFNProcessor] Modulators: LFO1=${this.lfo1Value.toFixed(3)} (enabled=${this.lfo1.isEnabled()}, amount=${this.graph.lfo1?.amount}), LFO2=${this.lfo2Value.toFixed(3)}`);
+        }
       }
 
       // Process envelope followers using input from relevant nodes
@@ -778,12 +952,22 @@ class MfnProcessor extends AudioWorkletProcessor {
         for (let s = 0; s < this.currentBlockSize; s++) {
           this.envelopeFollower1.process(Math.abs(mixedInputsForDestNode[0][s]));
         }
+
+        // Log occasionally for debugging
+        if (this.logCounter % (this.logThrottle * 10) === 0) {
+          console.log(`[MFNProcessor] EnvelopeFollower1 processing from source ${destNodeId}, current value: ${this.envelopeFollower1.getCurrentValue().toFixed(4)}, attack: ${this.graph.envelopeFollower1?.attack}, release: ${this.graph.envelopeFollower1?.release}`);
+        }
       }
 
       if (this.envelopeFollower2.isEnabled() && this.envelopeFollower2.isForSource(destNodeId)) {
         // Use the first channel of mixed inputs as the envelope source
         for (let s = 0; s < this.currentBlockSize; s++) {
           this.envelopeFollower2.process(Math.abs(mixedInputsForDestNode[0][s]));
+        }
+
+        // Log occasionally for debugging
+        if (this.logCounter % (this.logThrottle * 10) === 0) {
+          console.log(`[MFNProcessor] EnvelopeFollower2 processing from source ${destNodeId}, current value: ${this.envelopeFollower2.getCurrentValue().toFixed(4)}, attack: ${this.graph.envelopeFollower2?.attack}, release: ${this.graph.envelopeFollower2?.release}`);
         }
       }
 
