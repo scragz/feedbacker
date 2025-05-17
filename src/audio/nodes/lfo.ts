@@ -137,6 +137,20 @@ export class LFOProcessor {
    * Get the current value without updating the phase
    */
   getCurrentValue(): number {
-    return this.enabled ? this.state.lastValue * this.amount : 0;
+    if (!this.enabled) return 0;
+
+    // For display purposes, ensure we're returning oscillating values
+    // even when not processing
+    const now = Date.now() / 1000; // Current time in seconds
+    const phase = (now * this.frequency) % 1.0;
+
+    const result = calculateLFOValue(
+      this.waveform,
+      phase,
+      this.state.lastRandomValue,
+      this.state.randomPhase
+    );
+
+    return result.value * this.amount;
   }
 }

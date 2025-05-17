@@ -23,7 +23,7 @@
   border-bottom: none;
 }
 
-.knobContainer {
+.controlContainer {
   display: flex;
   justify-content: center;
   align-items: center;

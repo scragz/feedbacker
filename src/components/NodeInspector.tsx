@@ -78,7 +78,7 @@ export function NodeInspector({
                   }}
                   allowDeselect={false}
                 />                ) : paramDef.type === 'float' || paramDef.type === 'integer' ? (
-                <div className={classes.knobContainer}>
+                <div className={classes.controlContainer}>
                   <Slider
                     min={paramDef.minValue ?? 0}
                     max={paramDef.maxValue ?? 100}
@@ -127,6 +127,60 @@ export function NodeInspector({
                   onModulationChange={(paramId, source, enabled, amount) => {
                     onModulationChange(selectedNode.id, paramId, source, enabled, amount);
                   }}
+                  baseValue={currentValue as number}
+                  modulatedValue={
+                    // If there's any active modulation for this parameter, show a simulated modulated value
+                    // In reality, the actual modulated values are calculated in the AudioWorklet
+                    (selectedNode.modulation?.[paramId]?.lfo1?.enabled ||
+                     selectedNode.modulation?.[paramId]?.lfo2?.enabled ||
+                     selectedNode.modulation?.[paramId]?.env1?.enabled ||
+                     selectedNode.modulation?.[paramId]?.env2?.enabled) ?
+                      // Simple simulation for display purposes
+                      (() => {
+                        const value = currentValue as number;
+                        const mod = selectedNode.modulation?.[paramId];
+                        if (!mod) return value;
+
+                        // Calculate total modulation effect (simplified)
+                        let totalEffect = 0;
+                        // Use a stronger effect for UI display to make modulation more visible
+                        if (mod.lfo1?.enabled) {
+                          // Animate faster for a more noticeable effect on UI
+                          totalEffect += mod.lfo1.amount * Math.sin(Date.now() / 400);
+                        }
+                        if (mod.lfo2?.enabled) {
+                          // Different phase for LFO2
+                          totalEffect += mod.lfo2.amount * Math.sin(Date.now() / 600 + Math.PI/2);
+                        }
+                        if (mod.env1?.enabled) totalEffect += mod.env1.amount * 0.7;
+                        if (mod.env2?.enabled) totalEffect += mod.env2.amount * 0.7;
+
+                        // Apply modulation effect (simplified simulation)
+                        let modValue = value;
+                        if (paramDef.scale === 'logarithmic' && value > 0) {
+                          // For logarithmic parameters, apply in log space
+                          const logVal = Math.log10(value);
+                          const logMin = Math.log10(Math.max(0.000001, paramDef.minValue ?? 0.000001));
+                          const logMax = Math.log10(paramDef.maxValue ?? 20000);
+                          const logRange = logMax - logMin;
+                          // Apply modulation more directly (similar to how it works in the processor)
+                          const newLogVal = logVal + totalEffect * logRange;
+                          modValue = Math.pow(10, newLogVal);
+                        } else {
+                          // For linear parameters - apply direct modulation similar to processor
+                          const range = (paramDef.maxValue ?? 1) - (paramDef.minValue ?? 0);
+                          modValue = value + totalEffect * range;
+                        }
+
+                        // Ensure we stay in parameter range
+                        return Math.max(
+                          paramDef.minValue ?? 0,
+                          Math.min(paramDef.maxValue ?? 100, modValue)
+                        );
+                      })()
+                    : undefined
+                  }
+                  unit={paramDef.unit}
                 />
               )}
               <Text size="xs" c="dimmed" mt={2}>

@@ -76,16 +76,16 @@ const initialGraph: AudioGraph = {
 
   // Default LFO settings
   lfo1: {
-    enabled: false,
+    enabled: true, // Set to true so global LFO1 is active by default
     frequency: 1.0, // 1 Hz
     waveform: 'sine',
-    amount: 0,
+    amount: 1, // Changed from 0 to 1 for better modulation effect
   },
   lfo2: {
     enabled: false,
     frequency: 0.5, // 0.5 Hz
     waveform: 'triangle',
-    amount: 0,
+    amount: 1, // Changed from 0 to 1 for better modulation effect
   },
 
   // Default envelope follower settings
@@ -531,10 +531,15 @@ function App() {
             isRecording={isRecording}
             onPlayPause={() => void handlePlayPause()} // Ensure void return for onPlayPause
             onRecord={handleRecord}
-            chaosValue={globalParameters.chaos * 100} // Assuming chaos is 0-1 in state, UI wants 0-100
-            onChaosChange={handleChaosChange}
             isMono={isMono}
             onMonoToggle={handleMonoToggle}
+          />
+          <StatusDisplay
+            initMessageSent={initMessageSent}
+            audioError={audioError}
+            audioInitialized={audioInitialized}
+            processorReady={processorReady}
+            audioContextState={audioContextState}
           />
           <ModulationPanel
             lfo1={audioGraph.lfo1 ?? {

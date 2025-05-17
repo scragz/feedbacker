@@ -94,10 +94,10 @@ class MfnProcessor extends AudioWorkletProcessor {
     }
 
     // Initialize global LFOs and envelope followers
-    this.lfo1 = new LFOProcessor(1, 'sine', 0, this.sampleRateInternal); // Changed amount from 1 to 0
-    this.lfo2 = new LFOProcessor(0.5, 'triangle', 0, this.sampleRateInternal); // Changed amount from 1 to 0
-    this.envelopeFollower1 = new EnvelopeFollower(0.01, 0.1, 0, this.sampleRateInternal); // Changed amount from 1 to 0
-    this.envelopeFollower2 = new EnvelopeFollower(0.05, 0.5, 0, this.sampleRateInternal); // Changed amount from 1 to 0
+    this.lfo1 = new LFOProcessor(1, 'sine', 1, this.sampleRateInternal); // Changed amount from 0 to 1
+    this.lfo2 = new LFOProcessor(0.5, 'triangle', 1, this.sampleRateInternal); // Changed amount from 0 to 1
+    this.envelopeFollower1 = new EnvelopeFollower(0.01, 0.1, 1, this.sampleRateInternal); // Changed amount from 0 to 1
+    this.envelopeFollower2 = new EnvelopeFollower(0.05, 0.5, 1, this.sampleRateInternal); // Changed amount from 0 to 1
 
     this.port.onmessage = this.handleMessage.bind(this);
     console.log('[MFNProcessor] Initialized. Sample Rate:', this.sampleRateInternal, 'Max Channels:', this.maxOutputChannels);
@@ -498,6 +498,10 @@ class MfnProcessor extends AudioWorkletProcessor {
         // Scale modulation by chaos value (0-100)
         const chaosScale = 1 + (this.chaosValue / 100) * 3; // Max 4x at chaos 100
         totalModulation += lfo1Value * paramMods.lfo1.amount * chaosScale;
+        // Log modulation for debugging
+        if (this.logCounter % this.logThrottle === 0 && paramId === 'frequency') {
+          console.log(`[MFNProcessor] LFO1 modulating ${node.type}.${paramId}: baseValue=${baseValue}, lfo1Value=${lfo1Value}, amount=${paramMods.lfo1.amount}, totalMod=${totalModulation}`);
+        }
       }
 
       if (paramMods.lfo2?.enabled) {
@@ -537,11 +541,11 @@ class MfnProcessor extends AudioWorkletProcessor {
         const logRange = logMax - logMin;
 
         // Apply modulation in log space
-        const modulatedLog = logBase + totalModulation * logRange * 0.5;
+        const modulatedLog = logBase + totalModulation * logRange; // Increased modulation depth (removed * 0.5)
         modulatedValue = Math.pow(10, modulatedLog);
       } else {
         // Linear modulation
-        modulatedValue = baseValue + totalModulation * range * 0.5;
+        modulatedValue = baseValue + totalModulation * range; // Increased modulation depth (removed * 0.5)
       }
 
       // Clamp to parameter range
@@ -665,10 +669,19 @@ class MfnProcessor extends AudioWorkletProcessor {
       // Process global LFOs and envelope followers
       if (this.lfo1.isEnabled()) {
         this.lfo1Value = this.lfo1.process();
+      } else {
+        this.lfo1Value = 0; // Ensure zero value when disabled
       }
 
       if (this.lfo2.isEnabled()) {
         this.lfo2Value = this.lfo2.process();
+      } else {
+        this.lfo2Value = 0; // Ensure zero value when disabled
+      }
+
+      // Log modulator values occasionally for debugging
+      if (this.logCounter % (this.logThrottle * 5) === 0) {
+        console.log(`[MFNProcessor] Modulators: LFO1=${this.lfo1Value.toFixed(3)} (enabled=${this.lfo1.isEnabled()}, amount=${this.graph.lfo1?.amount}), LFO2=${this.lfo2Value.toFixed(3)}`);
       }
 
       // Process envelope followers using input from relevant nodes
