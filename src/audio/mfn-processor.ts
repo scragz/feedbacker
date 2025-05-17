@@ -24,6 +24,7 @@ import {
   NODE_PARAMETER_DEFINITIONS,
   type ParameterDefinition,
   type ParameterValue,
+  type LFOWaveformType,
 } from './schema';
 import { kernelRegistry } from '../lib/kernel-registry';
 import type { DSPKernel, NodeState } from './nodes/dsp-kernel';
@@ -419,17 +420,104 @@ class MfnProcessor extends AudioWorkletProcessor {
   private _setGlobalParameter(payload: SetGlobalParameterMessage['payload']): void {
     if (!this.graph) return;
     const { parameterId, value } = payload;
+
+    // Handle standard global parameters
     if (parameterId === 'masterGain' && typeof value === 'number') {
         this.graph.masterGain = value;
         console.log(`[MFNProcessor] Master gain updated to ${value}.`);
-        // It might be good to send GRAPH_UPDATED if masterGain is part of the graph state
-        // that the main thread might want to be aware of for UI syncing.
-        // However, if it's purely an audio processing param, this is fine.
-        // For now, let's assume App.tsx handles its own masterGain UI if needed
-        // and this message is primarily for the worklet's internal gain.
     } else if (parameterId === 'chaos' && typeof value === 'number') {
         this.chaosValue = value;
         console.log(`[MFNProcessor] Chaos value updated to ${this.chaosValue}.`);
+    }
+    // Handle LFO1 parameters
+    else if (parameterId.startsWith('lfo1.') && this.graph.lfo1) {
+        const lfoParam = parameterId.split('.')[1];
+
+        if (lfoParam === 'frequency' && typeof value === 'number') {
+            this.lfo1.setFrequency(value);
+            this.graph.lfo1.frequency = value;
+            console.log(`[MFNProcessor] LFO1 frequency updated to ${value}`);
+        } else if (lfoParam === 'waveform' && typeof value === 'string') {
+            // Validate and type cast the waveform value
+            const validWaveforms: LFOWaveformType[] = ['sine', 'square', 'triangle', 'sawtooth', 'random'];
+            if (validWaveforms.includes(value as LFOWaveformType)) {
+                const waveform = value as LFOWaveformType;
+                this.lfo1.setWaveform(waveform);
+                this.graph.lfo1.waveform = waveform;
+                console.log(`[MFNProcessor] LFO1 waveform updated to ${waveform}`);
+            } else {
+                console.warn(`[MFNProcessor] Invalid LFO1 waveform value: ${value}. Using default 'sine'.`);
+                this.lfo1.setWaveform('sine');
+                this.graph.lfo1.waveform = 'sine';
+            }
+        } else if (lfoParam === 'amount' && typeof value === 'number') {
+            this.lfo1.setAmount(value);
+            this.graph.lfo1.amount = value;
+            console.log(`[MFNProcessor] LFO1 amount updated to ${value}`);
+        } else if (lfoParam === 'enabled' && typeof value === 'boolean') {
+            this.lfo1.setEnabled(value);
+            this.graph.lfo1.enabled = value;
+            console.log(`[MFNProcessor] LFO1 enabled state updated to ${value}`);
+        } else {
+            console.warn(`[MFNProcessor] Unknown LFO1 parameter: ${lfoParam}`);
+        }
+    }
+    // Handle LFO2 parameters
+    else if (parameterId.startsWith('lfo2.') && this.graph.lfo2) {
+        const lfoParam = parameterId.split('.')[1];
+
+        if (lfoParam === 'frequency' && typeof value === 'number') {
+            this.lfo2.setFrequency(value);
+            this.graph.lfo2.frequency = value;
+            console.log(`[MFNProcessor] LFO2 frequency updated to ${value}`);
+        } else if (lfoParam === 'waveform' && typeof value === 'string') {
+            this.lfo2.setWaveform(value as LFOWaveformType);
+            this.graph.lfo2.waveform = value as LFOWaveformType;
+            console.log(`[MFNProcessor] LFO2 waveform updated to ${value}`);
+        } else if (lfoParam === 'amount' && typeof value === 'number') {
+            this.lfo2.setAmount(value);
+            this.graph.lfo2.amount = value;
+            console.log(`[MFNProcessor] LFO2 amount updated to ${value}`);
+        } else if (lfoParam === 'enabled' && typeof value === 'boolean') {
+            this.lfo2.setEnabled(value);
+            this.graph.lfo2.enabled = value;
+            console.log(`[MFNProcessor] LFO2 enabled state updated to ${value}`);
+        } else {
+            console.warn(`[MFNProcessor] Unknown LFO2 parameter: ${lfoParam}`);
+        }
+    }
+    // Handle envelope follower parameters (can be expanded if needed)
+    else if (parameterId.startsWith('envelopeFollower1.') || parameterId.startsWith('envelopeFollower2.')) {
+        // Handle envelope follower parameters similarly
+        const [modId, modParam] = parameterId.split('.');
+        const modulator = modId === 'envelopeFollower1' ? this.envelopeFollower1 : this.envelopeFollower2;
+        const graphModulator = modId === 'envelopeFollower1' ? this.graph.envelopeFollower1 : this.graph.envelopeFollower2;
+
+        if (graphModulator) {
+            if (modParam === 'attack' && typeof value === 'number') {
+                modulator.setAttackTime(value, this.sampleRateInternal);
+                graphModulator.attack = value;
+                console.log(`[MFNProcessor] ${modId} attack updated to ${value}`);
+            } else if (modParam === 'release' && typeof value === 'number') {
+                modulator.setReleaseTime(value, this.sampleRateInternal);
+                graphModulator.release = value;
+                console.log(`[MFNProcessor] ${modId} release updated to ${value}`);
+            } else if (modParam === 'amount' && typeof value === 'number') {
+                modulator.setAmount(value);
+                graphModulator.amount = value;
+                console.log(`[MFNProcessor] ${modId} amount updated to ${value}`);
+            } else if (modParam === 'enabled' && typeof value === 'boolean') {
+                modulator.setEnabled(value);
+                graphModulator.enabled = value;
+                console.log(`[MFNProcessor] ${modId} enabled updated to ${value}`);
+            } else if (modParam === 'source' && typeof value === 'string') {
+                modulator.setSource(value);
+                graphModulator.source = value;
+                console.log(`[MFNProcessor] ${modId} source updated to ${value}`);
+            } else {
+                console.warn(`[MFNProcessor] Unknown ${modId} parameter: ${modParam}`);
+            }
+        }
     } else {
         console.warn(`[MFNProcessor] Unknown global parameter: ${parameterId}`);
     }

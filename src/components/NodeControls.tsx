@@ -5,11 +5,9 @@ import type { NodeType } from '../audio/schema';
 
 export interface NodeControlsProps {
   onAddNode: (type: NodeType) => void;
-  audioContextState: AudioContextState | null;
-  onAudioResume: () => void;
 }
 
-const NodeControls: React.FC<NodeControlsProps> = ({ onAddNode, audioContextState, onAudioResume }) => {
+const NodeControls: React.FC<NodeControlsProps> = ({ onAddNode }) => {
   const addGainNode = () => {
     onAddNode('gain');
   };
@@ -34,11 +32,6 @@ const NodeControls: React.FC<NodeControlsProps> = ({ onAddNode, audioContextStat
 
   return (
     <div className={classes.controlsContainer}>
-      {audioContextState === 'suspended' && (
-        <Button onClick={onAudioResume} fullWidth variant="filled" color="orange" mb="sm">
-          Resume Audio Context
-        </Button>
-      )}
       <Group className={classes.buttonGroup} grow wrap="wrap">
         <Button onClick={addGainNode} variant="light">
           Gain

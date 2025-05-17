@@ -577,11 +577,7 @@ function App() {
             onEnvChange={handleEnvelopeFollowerChange}
             onChaosChange={handleChaosChange}
           />
-          <NodeControls
-            onAddNode={handleAddNode}
-            onAudioResume={() => void handleResumeAudio()} // Ensure void return
-            audioContextState={audioContextState}
-          />
+          <NodeControls onAddNode={handleAddNode} />
           <NodeList
             nodes={audioGraph.nodes}
             selectedNodeId={selectedNodeId}

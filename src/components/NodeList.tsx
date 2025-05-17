@@ -13,7 +13,6 @@ interface NodeListProps {
 const NodeList: React.FC<NodeListProps> = ({ nodes, selectedNodeId, onSelectNode, onRemoveNode }) => {
   return (
     <Paper p="md" shadow="xs" className={classes.nodeListContainer}>
-      <Text size="lg" ta="center" mb="sm" className={classes.nodeListTitle}>Current Nodes</Text>
       {nodes.length === 0 ? (
         <Text ta="center" c="dimmed">No nodes in the graph.</Text>
       ) : (

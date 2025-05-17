@@ -87,9 +87,6 @@ export function ModulationPanel({
 
   return (
     <Box p="md" className={classes.container}>
-      <Text size="lg" fw={600} mb="md">Modulation Controls</Text>
-
-      {/* Chaos Control - moved to the top, spanning across all sections */}
       <Box className={classes.chaosContainer}>
         <div className={classes.chaosKnob}>
           <Slider
